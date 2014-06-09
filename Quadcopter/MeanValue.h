@@ -8,6 +8,8 @@
 #ifndef MEANVALUE_H_
 #define MEANVALUE_H_
 
+#include <avr/io.h>
+
 template <class ValueType, class SumType, class CapacityType = uint8_t>
 class MeanValue {
 	private:
