@@ -69,12 +69,42 @@ class MeanValue {
 			return 0;
 		}
 
+		/**
+		 * Leert den Puffer und setzt alles wieder auf die Standardwerte zurück.
+		 */
 		void reset() {
 			index = 0;
 			filled = 0;
 			sum = 0;
 		}
 
+		/**
+		 * Mit dieser Methode kann man den Puffer schon einmal auf Vorrat
+		 * füllen. Sie tut im Grunde nichts anderes als operator() so
+		 * oft mit dem Wert @value aufzurufen wie der Puffer groß ist.
+		 *
+		 * @param value Der Wert, der als Standardwert in den Puffer
+		 *              geschrieben werden soll.
+		 */
+		void fillBuffer(ValueType value) {
+			for (CapacityType i = 0; i < capacity; i++) {
+				buffer[i] = value;
+			}
+			index = 0;
+			filled = capacity;
+			sum = value * capacity;
+		}
+
+		/**
+		 * Das ist die Hauptmethode der Klasse. Man übergibt einen Wert und bekommt
+		 * den gemittelten Wert zurück. Natürlich wird der Wert erst nach mehrmaligem
+		 * Aufruf nach dem Erstellen des Objektes oder nach einem reset()
+		 * tatsächlich gemittelt. Das dauert so lange bis der Puffer voll ist.
+		 *
+		 * @param  newValue Der neue Wert, der mit den letzten übergebenen Werten
+		 *                  gemittelt werden soll.
+		 * @return Der gemittelte Werte über die letzten @capacity Werte.
+		 */
 		ValueType operator()(ValueType newValue) {
 			if (filled < capacity) {
 				filled++;
