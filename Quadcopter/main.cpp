@@ -78,6 +78,8 @@ extern "C" void __cxa_pure_virtual() {
  *	E		4-7		39-42	Beschleunigungssensor (SCLK, MOSI, MISO, CS)
  *	E		0-3		35-38	Gyrosensor
  *	F		3-7		48-32	nRF24L01+
+ *	H		0-1				Debug-Taster
+ *	H		2-3				Debug-LED
  *
  */
 

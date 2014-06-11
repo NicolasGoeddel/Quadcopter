@@ -10,6 +10,7 @@
 
 #include "XMEGA_helper.h"
 #include <avr/io.h>
+#include "DEBUG.h"
 
 #define TIMER_FREQUENCY 50
 

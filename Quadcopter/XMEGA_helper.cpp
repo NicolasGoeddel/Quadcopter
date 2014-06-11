@@ -221,21 +221,24 @@ void setTimer(TC0_t & timer, PORT_t & port) {
 }
 
 uint16_t configureInterrupt(TC1_t & timer, uint32_t frequency) {
-	uint32_t a = F_CPU / frequency;
-	uint8_t clk_src = 1;
+	uint8_t prescale = 1;
+	uint16_t prescaler[] = {0, 1, 2, 4, 8, 64, 256, 1024};
+
+	uint32_t a = 65535;
+
 	while (a >= 65535) {
-		a = (F_CPU / _BV(clk_src)) / frequency;
-		clk_src++;
+		a = (F_CPU / prescaler[prescale]) / frequency;
+		prescale += (a >= 65535) ? 1 : 0;
 	}
 
-	if (clk_src > 7) {
+	if (prescale > 7) {
 		return 0;
 	}
 
 	uint8_t s = SREG;
 	cli();
 
-	timer.CTRLA = clk_src; //(timer.CTRLA & (~TC1_CLKSEL_gm)) | clk_src;
+	timer.CTRLA = prescale; //(timer.CTRLA & (~TC1_CLKSEL_gm)) | clk_src;
 	timer.CTRLB = 0; //(timer.CTRLB & (~(TC1_CCAEN_bm | TC1_CCBEN_bm | TC1_WGMODE_gm)));
 	timer.CTRLC = 0;
 	timer.CTRLD = 0; //(timer.CTRLD & (~(TC0_EVACT_gm | TC0_EVSEL_gm))) | TC_EVACT_OFF_gc | TC_EVSEL_OFF_gc;
