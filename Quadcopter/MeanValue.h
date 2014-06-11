@@ -41,6 +41,13 @@ class MeanValue {
 		 */
 		ValueType* buffer;
 	public:
+		MeanValue() {
+			capacity = 2;
+			index = 0;
+			filled = 0;
+			sum = 0;
+			buffer = (ValueType*) malloc(capacity * sizeof(ValueType));
+		}
 		MeanValue(CapacityType capacity) {
 			this->capacity = capacity;
 			index = 0;

@@ -42,6 +42,7 @@
 #include "SPI.h"
 #include "myMath.h"
 #include <avr/interrupt.h>
+#include "MeanValue.h"
 
 /**
  * Wenn USE_OFFSET auf 1 steht, dann werden die Hardware-Offsets benutzt,
@@ -164,17 +165,7 @@ class ADXL345 {
 		 * Diese Array enthält alle letzten n Werte für das Smoothing-Verfahren und
 		 * arbeitet wie ein Ringpuffer.
 		 */
-		int16_t* smoothSamples[3];
-
-		/**
-		 * Anzahl der Werte, über die der Mittelwert gebildet werden soll.
-		 */
-		uint8_t smoothCount;
-
-		/**
-		 * Der aktuelle Index des letzten Elements im Ringpuffer.
-		 */
-		uint8_t smoothIndex;
+		MeanValue<int16_t, int32_t> smoothValues[3];
 
 		/**
 		 * Der eingestellte Messbereich. Mögliche Werte sind 2, 4, 8 und 16
@@ -285,7 +276,7 @@ class ADXL345 {
 		 *
 		 * @param PORT Der Port, an dem der ADXL345 angeschlossen ist.
 		 */
-		ADXL345(PORT_t & PORT) : spi(PORT)	{
+		ADXL345(PORT_t & PORT) : spi(PORT) {
 			port = &PORT;
 			port->DIRSET = _BV(CS);
 			port->OUTSET = _BV(CS);
@@ -297,11 +288,8 @@ class ADXL345 {
 			for (uint8_t i = 0; i < 3; i++) {
 				meterPerSecSec[i] = 0.0;
 				accelSampleSum[i] = 0;
-				smoothSamples[i] = (int16_t*) 0;
 			}
 
-			smoothCount = 0;
-			smoothIndex = 0;
 			sampleRate = SampleRate_100;
 			range = 2;
 			accelScaleFactor = ENV_G * (float)range / 32768.0;
@@ -320,23 +308,8 @@ class ADXL345 {
 		 *        werden soll.
 		 */
 		void setSmooth(uint8_t smoothCount) {
-			this->smoothCount = smoothCount;
-			smoothIndex = 0;
 			for (uint8_t axis = 0; axis < 3; axis++) {
-				if (smoothSamples[axis]) {
-					free(smoothSamples[axis]);
-				} else {
-					smoothSamples[axis] = (int16_t*) malloc(smoothCount * sizeof(int16_t));
-					for (uint8_t sample = 0; sample < smoothCount; sample++) {
-						smoothSamples[axis][sample] = 0;
-					}
-				}
-			}
-			accelSampleSum[0] = 0;
-			accelSampleSum[1] = 0;
-			accelSampleSum[2] = -32768 / range;
-			for (uint8_t sample = 0; sample < smoothCount; sample++) {
-				measureSmooth();
+				smoothValues[axis].setCapacity(smoothCount);
 			}
 		}
 
@@ -469,31 +442,17 @@ class ADXL345 {
 		 * den entsprechenden Gettern ausgelesen werden.
 		 */
 		void measureSmooth() {
-			if (smoothCount == 0) {
-				measure();
-				return;
-			}
-			int16_t x, y, z;
+			int16_t values[3];
+
+			readXYZ(values[0], values[1], values[2]);
 
 			for (uint8_t axis = 0; axis < 3; axis++) {
-				accelSampleSum[axis] -= smoothSamples[axis][smoothIndex];
-			}
-
-			readXYZ(x, y, z);
 #if USE_OFFSET
-			smoothSamples[0][smoothIndex] = x;
-			smoothSamples[1][smoothIndex] = y;
-			smoothSamples[2][smoothIndex] = z;
+				meterPerSecSec[axis] = smoothValues[axis](values[axis]) * accelScaleFactor;
 #else
-			smoothSamples[0][smoothIndex] = (x - offset[0]);
-			smoothSamples[1][smoothIndex] = (y - offset[1]);
-			smoothSamples[2][smoothIndex] = (z - offset[2]);
+				meterPerSecSec[axis] = smoothValues[axis](values[axis] - offset[axis]) * accelScaleFactor;
 #endif
-			for (uint8_t axis = 0; axis < 3; axis++) {
-				accelSampleSum[axis] += smoothSamples[axis][smoothIndex];
-				meterPerSecSec[axis] = -accelSampleSum[axis] * accelScaleFactor / smoothCount;
 			}
-			smoothIndex = (smoothIndex + 1) % smoothCount;
 		}
 
 		/**

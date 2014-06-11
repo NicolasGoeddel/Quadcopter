@@ -159,7 +159,7 @@ int main() {
 			//display.write(1, 0, "ACC:")->writeInt(acc.getOffset32(0))->write(",")->writeInt(acc.getOffset32(1))->write(",")->writeInt(acc.getOffset32(2));
 			display.setCursorPos(1, 0)->write("ACC:")->writeInt(acc.getOffset(0))->write(",")->writeInt(acc.getOffset(1))->write(",")->writeInt(acc.getOffset(2));
 		}
-		acc.setSmooth(10);
+		acc.setSmooth(5);
 	}
 
 	// Initialisiere Gyro
@@ -209,8 +209,8 @@ int main() {
 
 	// Duty Cycles für verschiedene Geschwindigkeiten
 	uint16_t zero     = ((uint32_t) max * 10 / 100);		// 10%
-	uint16_t standby  = ((uint32_t) max * 11 / 100);		// 11%
-	uint16_t power    = ((uint32_t) max * 125 / 1000);		// 12.5%
+	uint16_t standby  = ((uint32_t) max * 125 / 1000);		// 12.5%
+	uint16_t power    = ((uint32_t) max * 130 / 1000);		// 13%
 	uint16_t maxPower = ((uint32_t) max * 175 / 1000);		// 17.5%
 	uint16_t speed    = zero;
 
@@ -234,8 +234,8 @@ int main() {
 	PID pidY(PID_P * PID_Scale, PID_I * PID_Scale, PID_D * PID_Scale, dT);
 	pidY.setIBand(PID_I_Band, PID_I_Min, PID_I_Max);
 
-	CFilter filterX(0.075, dT);
-	CFilter filterY(0.075, dT);
+	CFilter filterX(0.035, dT);
+	CFilter filterY(0.035, dT);
 
 	float angleX, angleY;
 	float pidAngleX, pidAngleY;
@@ -255,7 +255,7 @@ int main() {
 
 			// Gyro und Beschleunigungssensor auslesen
 			gyro.measureSmooth();
-			acc.measure();
+			acc.measureSmooth();
 
 			// Beschleunigung "normalisieren"
 			accZ = (-acc.z() - ENV_G);
@@ -301,11 +301,10 @@ int main() {
 
 			// Debug-Infos ausgeben
 #			ifdef DISPLAY
-			display.setCursorPos(0, 0)->write("a:")->writeInt4x3(acc.x() * 100, acc.y() * 100, acc.z());
-//			display.write(0, 0, "a:")->writeFloat(acc.z());
+			display.setCursorPos(0, 0)->write("a:")->writeInt4x3(acc.x() * 100, acc.y() * 100, acc.z() * 100);
 			display.setCursorPos(1, 0)->write("g:")->writeInt4x3(gyro.x() * 100, gyro.y() * 100, gyro.z() * 100);
-//			display.write(2, 0, "f:")->writeInt4x3(angleX * 57.295779579, pidAngleX * 57.295779579, remoteState);
-			display.setCursorPos(2, 0)->write("r:")->writeInt4x3(remoteX, remoteY, remoteState);
+			display.setCursorPos(2, 0)->write("f:")->writeInt4x3(angleX * 57.295779579, angleY * 57.295779579, remoteState);
+//			display.setCursorPos(2, 0)->write("r:")->writeInt4x3(remoteX, remoteY, remoteState);
 #			endif
 
 #			ifdef BLUETOOTH
@@ -355,8 +354,8 @@ int main() {
 
 			if (speed != zero) {
 				// Motormischer
-				motor.m[0] = speed - pwmY;
-				motor.m[2] = speed + pwmY;
+				motor.m[0] = speed + pwmY;
+				motor.m[2] = speed - pwmY;
 				motor.m[1] = speed + pwmX;
 				motor.m[3] = speed - pwmX;
 				motor.cutBorders(0, maxPower);
