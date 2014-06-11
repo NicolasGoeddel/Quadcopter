@@ -11,9 +11,8 @@
 #include <avr/io.h>
 #include <stdlib.h>		// wg. itoa
 #include "libstdcpp.h"	// für new und delete
-#include "IOutDevice.h"
 
-class OutDevice : public IOutDevice<OutDevice> {
+class OutDevice {
 	private:
 		OutDevice* outDevice;
 

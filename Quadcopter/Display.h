@@ -51,8 +51,7 @@
 #include <avr/io.h>
 #include <util/delay.h>
 
-#include "IOutDevice.h"
-#include "OutDevice.h"
+#include "StringDevice.h"
 
 	// display commands
 #define LCD_CMD_SETFUNCTIONMODE          0xc0  // SF
@@ -124,10 +123,9 @@
 
 //#define Display_delay for (uint8_t i = 0; i < 254; i++) { asm("nop"); }
 
-class Display : public IOutDevice<Display> {
+class Display : public StringDevice<Display> {
 	private:
 		PORT_t * port;
-		OutDevice outDevice;
 
 		enum PORT {
 			DB4 = 0,	// DB4-DB7 müssen auf PIN0-PIN3 gemappt bleiben
@@ -162,7 +160,7 @@ class Display : public IOutDevice<Display> {
 //			port->OUTCLR = 0xf0;
 		}
 	public:
-		Display(PORT_t & PORT) : outDevice((OutDevice*) this) {
+		Display(PORT_t & PORT) {
 			port = &PORT;
 			port->DIR = 0xff;
 			port->OUTCLR = 0xff;
@@ -204,25 +202,21 @@ class Display : public IOutDevice<Display> {
 			setCursorPos(0, 0);
 		}
 
-		Display* write(const char c) {
+		using StringDevice<Display>::write;
+
+		Display* writeChar(const char c) {
 			send(_BV(IOC2), c);
 			return this;
 		}
 
-		Display* write(const uint8_t row, const uint8_t column, const char* text) {
-			setCursorPos(row, column);
-			outDevice.write(text);
-			return this;
-		}
-
-		Display* writeUint3x3(const uint16_t x, const uint16_t y, const uint16_t z) {
-			outDevice.writeUint3(x);
-			write(',');
-			outDevice.writeUint3(y);
-			write(',');
-			outDevice.writeUint3(z);
-			return this;
-		}
+//		Display* writeUint3x3(const uint16_t x, const uint16_t y, const uint16_t z) {
+//			writeUint3(x);
+//			writeChar(',');
+//			writeUint3(y);
+//			writeChar(',');
+//			writeUint3(z);
+//			return this;
+//		}
 };
 
 #endif /* DISPLAY_H_ */

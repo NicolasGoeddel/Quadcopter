@@ -47,7 +47,6 @@ extern "C" void __cxa_pure_virtual() {
 
 #include <stdlib.h>
 #include <avr/io.h>
-
 #include "XMEGA_helper.h"
 #include "Display.h"
 #include "Bluetooth.h"
@@ -130,7 +129,6 @@ int main() {
 
 	// Display initialisieren
 	Display display(PORTC);
-	OutDevice displayO((OutDevice*) &display);
 	display.init();
 	_delay_ms(50);
 
@@ -139,8 +137,7 @@ int main() {
 
 	// init4ChanPWM gibt als Rückgabewert den maximalen DutyCycle zurück
 	uint16_t max = init4ChanPWM(PORTD, TCD0, 100);
-	display.write(0, 0, "PWM max=");
-	displayO.writeUint(max);
+	display.setCursorPos(0, 0)->write("PWM max=")->writeUint(max);
 
 	//Aktiviere die Interrupts
 	activateInterrupts();
@@ -151,15 +148,14 @@ int main() {
 	//template <uint8_t CS, uint8_t MOSI, uint8_t MISO, uint8_t SCLK>
 	ADXL345<4, 5, 6, 7> acc(PORTE);
 	if (!acc.isDeviceOk()) {
-		display.write(errorLine++, 0, "ACC ERROR!");
+		display.setCursorPos(errorLine++, 0)->write("ACC ERROR!");
 	} else {
 		acc.setDefaults();
 		if (!acc.calibrate()) {
-			display.write(1, 0, "ACC CAL WARN!");
+			display.setCursorPos(1, 0)->write("ACC CAL WARN!");
 		} else {
 			//display.write(1, 0, "ACC:")->writeInt(acc.getOffset32(0))->write(",")->writeInt(acc.getOffset32(1))->write(",")->writeInt(acc.getOffset32(2));
-			display.write(1, 0, "ACC:");
-			displayO.writeInt(acc.getOffset(0))->write(",")->writeInt(acc.getOffset(1))->write(",")->writeInt(acc.getOffset(2));
+			display.setCursorPos(1, 0)->write("ACC:")->writeInt(acc.getOffset(0))->write(",")->writeInt(acc.getOffset(1))->write(",")->writeInt(acc.getOffset(2));
 		}
 		acc.setSmooth(10);
 	}
@@ -167,46 +163,42 @@ int main() {
 	// Initialisiere Gyro
 	L3G4200D<2, 1, 0, 3> gyro(PORTE);
 	if (!gyro.isDeviceOk()) {
-		display.setCursorPos(errorLine++, 0);
-		displayO.write("GYRO ERROR!");
+		display.setCursorPos(errorLine++, 0)->write("GYRO ERROR!");
 	} else {
 		gyro.setDefaults();
 		gyro.calibrate();
 		gyro.setSmooth(3);
-		display.write(2, 0, "GYRO ok.");
+		display.setCursorPos(2, 0)->write("GYRO ok.");
 	}
 
 #	ifdef REMOTE
 	// Initialisiere die Fernbedienung
 	Transmitter remote;
 	if (remote.getConfigStatus() != 0) {
-		display.setCursorPos(errorLine++, 0);
-		displayO.write("RF Error: ")->writeUint(remote.getConfigStatus());
+		display.setCursorPos(errorLine++, 0)->write("RF Error: ")->writeUint(remote.getConfigStatus());
 	} else {
-		display.write(3, 0, "Remote ok.");
+		display.setCursorPos(3, 0)->write("Remote ok.");
 	}
 #	endif
 
 #	ifdef BLUETOOTH
 	// Initialisiere Bluetooth Debugger
 	Bluetooth bt(9600);
-	OutDevice btO((OutDevice*) &bt);
 	if (!bt.isDeviceOk()) {
-		display.setCursorPos(errorLine++, 0);
-		displayO.write("BLUETOOTH ERROR!");
+		display.setCursorPos(errorLine++, 0)->write("BLUETOOTH ERROR!");
 	} else {
-		display.write(0, 0, "Bluetooth ok.");
+		display.setCursorPos(0, 0)->write("Bluetooth ok.");
 	}
 #	endif
 
 	// Wenn ein Fehler aufgetreten ist, beende das Programm, damit man die Fehlermeldung sehen kann.
 	if (errorLine > 0) {
-		display.write(3, 0, "STOPPING DEVICE!");
+		display.setCursorPos(3, 0)->write("STOPPING DEVICE!");
 		while (true);
 	} else {
 		_delay_ms(500);
 		display.clear();
-		display.write(0, 0, "Calibrating done");
+		display.setCursorPos(0, 0)->write("Calibrating done");
 		_delay_ms(1000);
 		display.clear();
 	}
@@ -307,28 +299,25 @@ int main() {
 
 			// Debug-Infos ausgeben
 #			ifdef DISPLAY
-			display.write(0, 0, "a:");
-			displayO.writeInt4x3(acc.x() * 100, acc.y() * 100, acc.z());
+			display.setCursorPos(0, 0)->write("a:")->writeInt4x3(acc.x() * 100, acc.y() * 100, acc.z());
 //			display.write(0, 0, "a:")->writeFloat(acc.z());
-			display.write(1, 0, "g:");
-			displayO.writeInt4x3(gyro.x() * 100, gyro.y() * 100, gyro.z() * 100);
+			display.setCursorPos(1, 0)->write("g:")->writeInt4x3(gyro.x() * 100, gyro.y() * 100, gyro.z() * 100);
 //			display.write(2, 0, "f:")->writeInt4x3(angleX * 57.295779579, pidAngleX * 57.295779579, remoteState);
-			display.write(2, 0, "r:");
-			displayO.writeInt4x3(remoteX, remoteY, remoteState);
+			display.setCursorPos(2, 0)->write("r:")->writeInt4x3(remoteX, remoteY, remoteState);
 #			endif
 
 #			ifdef BLUETOOTH
 			if (remote.getButton(Transmitter::btnFire)) {
-				btO.write("Fire!\r\n");
+				bt.write("Fire!\r\n");
 			}
 			if (remote.getButton(Transmitter::btnTop)) {
-				btO.writeFloatRaw(NAN);
-				btO.writeFloatRaw(acc.x());
-				btO.writeFloatRaw(acc.y());
-				btO.writeFloatRaw(acc.z());
-				btO.writeFloatRaw(gyro.x());
-				btO.writeFloatRaw(gyro.y());
-				btO.writeFloatRaw(gyro.z());
+				bt.writeFloatRaw(NAN);
+				bt.writeFloatRaw(acc.x());
+				bt.writeFloatRaw(acc.y());
+				bt.writeFloatRaw(acc.z());
+				bt.writeFloatRaw(gyro.x());
+				bt.writeFloatRaw(gyro.y());
+				bt.writeFloatRaw(gyro.z());
 			}
 #			endif
 
@@ -350,12 +339,11 @@ int main() {
 
 			if (remote.getButton(Transmitter::btnBottom)) {
 				display.clear();
-				display.write(0, 0, "Calibrating...");
+				display.setCursorPos(0, 0)->write("Calibrating...");
 				uint8_t tmp = (acc.calibrate()) ? 1 : 0;
 				gyro.calibrate();
-				display.write(1, 0, "GYRO calibrated.");
-				display.write(2, 0, "ACC error= ");
-				displayO.writeUint(tmp);
+				display.setCursorPos(1, 0)->write("GYRO calibrated.");
+				display.setCursorPos(2, 0)->write("ACC error= ")->writeUint(tmp);
 				pidX.reset();
 				pidY.reset();
 				posZ = 0.0;
@@ -390,12 +378,10 @@ int main() {
 //		display.write(2, 8, "m3: ")->writeInt(perc)->write("%  ");
 		//perc = ((int32_t)(motor.m[1] - zero) * 100) / (maxPower - zero);
 		perc = ((int32_t)motor.m[1] * 100) / max;
-		display.write(3, 0, "m1: ");
-		displayO.writeInt(perc)->write("%  ");
+		display.setCursorPos(3, 0)->write("m1:")->writeInt4(perc)->write("%");
 		//perc = ((int32_t)(motor.m[3] - zero) * 100) / (maxPower - zero);
 		perc = ((int32_t)motor.m[3] * 100) / max;
-		display.write(3, 8, "m3: ");
-		displayO.writeInt(perc)->write("%  ");
+		display.setCursorPos(3, 0)->write("m3:")->writeInt4(perc)->write("%");
 #		endif
 	}
 }

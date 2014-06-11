@@ -12,8 +12,7 @@
 #include "USART.h"
 #include <stdio.h>
 #include <stdlib.h>
-#include "IOutDevice.h"
-#include "OutDevice.h"
+#include "StringDevice.h"
 
 /**
  * Diese Klasse nutzt den USART (aktuell noch ohne Klassenstruktur)
@@ -25,7 +24,7 @@
  * Werk aus die Baudrate 9600 nutzt. Das heißt beim ersten Mal sollte
  * man die Klasse mit der Baudrate 9600 initialisieren.
  */
-class Bluetooth : public IOutDevice<Bluetooth> {
+class Bluetooth : public StringDevice<Bluetooth> {
 	public:
 		/**
 		 * Erstelle ein Objekt der Bluetooth-Klasse mit einer bestimmten
@@ -48,6 +47,8 @@ class Bluetooth : public IOutDevice<Bluetooth> {
 		 */
 		bool setBaud(uint32_t baud);
 
+		using StringDevice<Bluetooth>::write;
+
 		/**
 		 * Wenn der Bluetooth-Adapter verbunden ist, wird dadurch
 		 * ein Zeichen an den Empfänger gesendet. Ist er nicht verbunden
@@ -55,15 +56,8 @@ class Bluetooth : public IOutDevice<Bluetooth> {
 		 *
 		 * @param c Das zu sendende Zeichen.
 		 */
-		Bluetooth* write(const char c) {
+		Bluetooth* writeChar(const char c) {
 			USART_putchar(c);
-			return this;
-		}
-
-		Bluetooth* write(const char * c) {
-			while (*c) {
-				USART_putchar(*(c++));
-			}
 			return this;
 		}
 
