@@ -11,59 +11,37 @@
 #include <avr/io.h>
 #include <stdlib.h>		// wg. itoa
 #include "libstdcpp.h"	// für new und delete
+#include "IOutDevice.h"
 
-template <class ReturnType>
-class OutDevice {
+class OutDevice : public IOutDevice<OutDevice> {
+	private:
+		OutDevice* outDevice;
+
 	public:
-		virtual ~OutDevice() {};
+		OutDevice();
+		OutDevice(OutDevice* outDevice);
 
-		virtual ReturnType* write(const char c) = 0;
+		~OutDevice() {};
+
+		OutDevice* write(const char c) {
+			outDevice->write(c);
+			return this;
+		}
 
 		/**
 		 * Schreibt einen kompletten String zum Ausgabegerät.
 		 *
 		 * @param s Der zu sendende String.
 		 */
-		ReturnType* write(const char * c) {
-			while (*c) {
-				write(*c++);
-			}
-			return (ReturnType*) this;
-		}
+		OutDevice* write(const char * c);
 
-		ReturnType* writeInt(const int16_t i) {
-			char buf[8];
-			ltoa(i, buf, 10);
-			write(buf);
-			return (ReturnType*) this;
-		}
+		OutDevice* writeInt(const int16_t i);
 
-		ReturnType* writeInt4(const int16_t i) {
-			if (i >= 0) write(' ');
-			int16_t j = (i < 0) ? -i : i;
-			if (j < 100) write(' ');
-			if (j < 10) write(' ');
-			char buf[8];
-			ltoa(i, buf, 10);
-			write(buf);
-			return (ReturnType*) this;
-		}
+		OutDevice* writeInt4(const int16_t i);
 
-		ReturnType* writeInt4x3(const int16_t x, const int16_t y, const int16_t z) {
-			writeInt4(x);
-			write(',');
-			writeInt4(y);
-			write(',');
-			writeInt4(z);
-			return (ReturnType*) this;
-		}
+		OutDevice* writeInt4x3(const int16_t x, const int16_t y, const int16_t z);
 
-		ReturnType* writeUint(const uint16_t i) {
-			char buf[7];
-			ultoa(i, buf, 10);
-			write(buf);
-			return (ReturnType*) this;
-		}
+		OutDevice* writeUint(const uint16_t i);
 
 		/**
 		 * Schreibt eine Fließkommazahl mit einer Genauigkeit von 4
@@ -71,13 +49,7 @@ class OutDevice {
 		 *
 		 * @param f Der zu schreibende Floatwert.
 		 */
-		ReturnType* writeFloat(float f) {
-			char fstr[8];
-
-			dtostrf(f, 8, 4, fstr);
-			write(fstr);
-			return (ReturnType*) this;
-		}
+		OutDevice* writeFloat(float f);
 
 		/**
 		 * Schreibt eine Fließkommazahl binär zum Ausgabegerät.
@@ -86,27 +58,9 @@ class OutDevice {
 		 *
 		 * @param f Der zu schreibende Floatwert.
 		 */
-		void writeFloatRaw(float f) {
-			union {
-			    unsigned char c[4];
-			    float f;
-			} pun;
+		OutDevice* writeFloatRaw(float f);
 
-			pun.f = f;
-			write(pun.c[0]);
-			write(pun.c[1]);
-			write(pun.c[2]);
-			write(pun.c[3]);
-		}
-
-		ReturnType* writeUint3(const uint16_t i) {
-			if (i < 100) write(' ');
-			if (i < 10) write(' ');
-			char buf[7];
-			ultoa(i, buf, 10);
-			write(buf);
-			return (ReturnType*) this;
-		}
+		OutDevice* writeUint3(const uint16_t i);
 
 };
 

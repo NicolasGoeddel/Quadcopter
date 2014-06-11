@@ -51,6 +51,7 @@
 #include <avr/io.h>
 #include <util/delay.h>
 
+#include "IOutDevice.h"
 #include "OutDevice.h"
 
 	// display commands
@@ -123,9 +124,10 @@
 
 //#define Display_delay for (uint8_t i = 0; i < 254; i++) { asm("nop"); }
 
-class Display : public OutDevice<Display> {
+class Display : public IOutDevice<Display> {
 	private:
 		PORT_t * port;
+		OutDevice outDevice;
 
 		enum PORT {
 			DB4 = 0,	// DB4-DB7 müssen auf PIN0-PIN3 gemappt bleiben
@@ -160,7 +162,7 @@ class Display : public OutDevice<Display> {
 //			port->OUTCLR = 0xf0;
 		}
 	public:
-		Display(PORT_t & PORT) {
+		Display(PORT_t & PORT) : outDevice((OutDevice*) this) {
 			port = &PORT;
 			port->DIR = 0xff;
 			port->OUTCLR = 0xff;
@@ -202,8 +204,6 @@ class Display : public OutDevice<Display> {
 			setCursorPos(0, 0);
 		}
 
-		using OutDevice<Display>::write;
-
 		Display* write(const char c) {
 			send(_BV(IOC2), c);
 			return this;
@@ -211,16 +211,16 @@ class Display : public OutDevice<Display> {
 
 		Display* write(const uint8_t row, const uint8_t column, const char* text) {
 			setCursorPos(row, column);
-			write(text);
+			outDevice.write(text);
 			return this;
 		}
 
 		Display* writeUint3x3(const uint16_t x, const uint16_t y, const uint16_t z) {
-			writeUint3(x);
+			outDevice.writeUint3(x);
 			write(',');
-			writeUint3(y);
+			outDevice.writeUint3(y);
 			write(',');
-			writeUint3(z);
+			outDevice.writeUint3(z);
 			return this;
 		}
 };

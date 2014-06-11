@@ -32,17 +32,25 @@
  * Programm erhalten haben. Wenn nicht, siehe <http://www.gnu.org/licenses/>.
  */
 
+#include "DEBUG.h"
+#include <util/delay.h>
+
 /**
  * Siehe: http://stackoverflow.com/questions/920500/what-is-the-purpose-of-cxa-pure-virtual
  */
-extern "C" void __cxa_pure_virtual() { while (1); }
+extern "C" void __cxa_pure_virtual() {
+	while (true) {
+		DEBUG_LED(-1);
+		_delay_ms(100);
+	}
+}
 
 #include <stdlib.h>
-#include <util/delay.h>
 #include <avr/io.h>
-#include "Bluetooth.h"
+
 #include "XMEGA_helper.h"
 #include "Display.h"
+#include "Bluetooth.h"
 #include "ADXL345.h"
 #include "L3G4200D.h"
 #include "timer.h"
@@ -53,10 +61,10 @@ extern "C" void __cxa_pure_virtual() { while (1); }
 #include "Transmitter.h"
 #include "Clock.h"
 
-
 //#define DEBUG_DMA
 //#define DEBUG_RF
 //#define DEBUG_USART
+//#define DEBUG_TEST
 #define MAIN_PROGRAM
 
 #define DISPLAY
@@ -67,19 +75,12 @@ extern "C" void __cxa_pure_virtual() { while (1); }
  *	PORT	BITS	PIN		Beschreibung
  *	C		0-7		15-22	Display
  *	D		0-3		25-28	Motorsteuerung
- *	D		6-7		31-32	serielle Schnittstelle
+ *	D		6-7		31-32	Bluetooth-Adapter
  *	E		4-7		39-42	Beschleunigungssensor (SCLK, MOSI, MISO, CS)
  *	E		0-3		35-38	Gyrosensor
  *	F		3-7		48-32	nRF24L01+
  *
  */
-
-void writeValue(Display & d, uint8_t row, int32_t value, char c) {
-	value += 32768;
-	value = (value * 15) / 65535;
-	d.setCursorPos(row, value);
-	d.write(c);
-}
 
 const float dT = 1.0 / TIMER_FREQUENCY;
 
@@ -104,13 +105,32 @@ struct Motor_t {
 
 Motor_t motor(0);
 
+#ifdef DEBUG_TEST
+int main() {
+	set32MHz();
+	_delay_ms(10);
+
+	// Für LED und Taster.
+	DEBUG_init();
+
+	while(1) {
+		DEBUG_LED(-1);
+		_delay_ms(250);
+	}
+}
+#endif
+
 #ifdef MAIN_PROGRAM
 int main() {
 	set32MHz();
 	_delay_ms(10);
 
+	// Für LED und Taster.
+	DEBUG_init();
+
 	// Display initialisieren
 	Display display(PORTC);
+	OutDevice displayO((OutDevice*) &display);
 	display.init();
 	_delay_ms(50);
 
@@ -119,7 +139,8 @@ int main() {
 
 	// init4ChanPWM gibt als Rückgabewert den maximalen DutyCycle zurück
 	uint16_t max = init4ChanPWM(PORTD, TCD0, 100);
-	display.write(0, 0, "PWM max=")->writeUint(max);
+	display.write(0, 0, "PWM max=");
+	displayO.writeUint(max);
 
 	//Aktiviere die Interrupts
 	activateInterrupts();
@@ -137,7 +158,8 @@ int main() {
 			display.write(1, 0, "ACC CAL WARN!");
 		} else {
 			//display.write(1, 0, "ACC:")->writeInt(acc.getOffset32(0))->write(",")->writeInt(acc.getOffset32(1))->write(",")->writeInt(acc.getOffset32(2));
-			display.write(1, 0, "ACC:")->writeInt(acc.getOffset(0))->write(",")->writeInt(acc.getOffset(1))->write(",")->writeInt(acc.getOffset(2));
+			display.write(1, 0, "ACC:");
+			displayO.writeInt(acc.getOffset(0))->write(",")->writeInt(acc.getOffset(1))->write(",")->writeInt(acc.getOffset(2));
 		}
 		acc.setSmooth(10);
 	}
@@ -146,7 +168,7 @@ int main() {
 	L3G4200D<2, 1, 0, 3> gyro(PORTE);
 	if (!gyro.isDeviceOk()) {
 		display.setCursorPos(errorLine++, 0);
-		display.write("GYRO ERROR!");
+		displayO.write("GYRO ERROR!");
 	} else {
 		gyro.setDefaults();
 		gyro.calibrate();
@@ -159,7 +181,7 @@ int main() {
 	Transmitter remote;
 	if (remote.getConfigStatus() != 0) {
 		display.setCursorPos(errorLine++, 0);
-		display.write("RF Error: ")->writeUint(remote.getConfigStatus());
+		displayO.write("RF Error: ")->writeUint(remote.getConfigStatus());
 	} else {
 		display.write(3, 0, "Remote ok.");
 	}
@@ -168,9 +190,10 @@ int main() {
 #	ifdef BLUETOOTH
 	// Initialisiere Bluetooth Debugger
 	Bluetooth bt(9600);
+	OutDevice btO((OutDevice*) &bt);
 	if (!bt.isDeviceOk()) {
 		display.setCursorPos(errorLine++, 0);
-		display.write("BLUETOOTH ERROR!");
+		displayO.write("BLUETOOTH ERROR!");
 	} else {
 		display.write(0, 0, "Bluetooth ok.");
 	}
@@ -199,18 +222,6 @@ int main() {
 
 	/*float x, y, z;
 	x = y = z = 0; */
-
-	// Debuggig-Taster und -LED
-	PORTH.DIR = _BV(1) | _BV(2) | _BV(3);
-	PORTH.PIN0CTRL = PORT_OPC_PULLDOWN_gc;
-
-	PORTH.PIN3CTRL = PORT_OPC_WIREDOR_gc;
-
-	PORTH.PIN1CTRL = PORT_OPC_WIREDOR_gc;	//Setzt PIN1 fest auf Vcc
-	PORTH.OUTSET = _BV(1);
-
-	PORTH.PIN2CTRL = PORT_OPC_WIREDAND_gc;	//Setzt PIN2 fest auf GND
-	PORTH.OUTCLR = _BV(2);
 
 	// Einstellung für Remote
 	#define MAX_ANGLE_DEG 45
@@ -246,7 +257,7 @@ int main() {
 	for (;;) {
 		if (clock.eventInterrupt) {
 			// Debug LED an
-			PORTH.OUTSET = _BV(3);
+			DEBUG_LED(1);
 
 			// Gyro und Beschleunigungssensor auslesen
 			gyro.measureSmooth();
@@ -296,32 +307,35 @@ int main() {
 
 			// Debug-Infos ausgeben
 #			ifdef DISPLAY
-			display.write(0, 0, "a:")->writeInt4x3(acc.x() * 100, acc.y() * 100, acc.z());
+			display.write(0, 0, "a:");
+			displayO.writeInt4x3(acc.x() * 100, acc.y() * 100, acc.z());
 //			display.write(0, 0, "a:")->writeFloat(acc.z());
-			display.write(1, 0, "g:")->writeInt4x3(gyro.x() * 100, gyro.y() * 100, gyro.z() * 100);
+			display.write(1, 0, "g:");
+			displayO.writeInt4x3(gyro.x() * 100, gyro.y() * 100, gyro.z() * 100);
 //			display.write(2, 0, "f:")->writeInt4x3(angleX * 57.295779579, pidAngleX * 57.295779579, remoteState);
-			display.write(2, 0, "r:")->writeInt4x3(remoteX, remoteY, remoteState);
+			display.write(2, 0, "r:");
+			displayO.writeInt4x3(remoteX, remoteY, remoteState);
 #			endif
 
 #			ifdef BLUETOOTH
 			if (remote.getButton(Transmitter::btnFire)) {
-				bt.write("Fire!\r\n");
+				btO.write("Fire!\r\n");
 			}
 			if (remote.getButton(Transmitter::btnTop)) {
-				bt.writeFloatRaw(NAN);
-				bt.writeFloatRaw(acc.x());
-				bt.writeFloatRaw(acc.y());
-				bt.writeFloatRaw(acc.z());
-				bt.writeFloatRaw(gyro.x());
-				bt.writeFloatRaw(gyro.y());
-				bt.writeFloatRaw(gyro.z());
+				btO.writeFloatRaw(NAN);
+				btO.writeFloatRaw(acc.x());
+				btO.writeFloatRaw(acc.y());
+				btO.writeFloatRaw(acc.z());
+				btO.writeFloatRaw(gyro.x());
+				btO.writeFloatRaw(gyro.y());
+				btO.writeFloatRaw(gyro.z());
 			}
 #			endif
 
 			//z = pidFilterX(16384, x);
 
 #			ifdef REMOTE
-			if (remote.getButton(Transmitter::btnFire) || (PORTH.IN & _BV(0))) {
+			if (remote.getButton(Transmitter::btnFire) || (DEBUG_Button())) {
 				speed = standby;
 			} else {
 				speed = zero;
@@ -340,7 +354,8 @@ int main() {
 				uint8_t tmp = (acc.calibrate()) ? 1 : 0;
 				gyro.calibrate();
 				display.write(1, 0, "GYRO calibrated.");
-				display.write(2, 0, "ACC error= ")->writeUint(tmp);
+				display.write(2, 0, "ACC error= ");
+				displayO.writeUint(tmp);
 				pidX.reset();
 				pidY.reset();
 				posZ = 0.0;
@@ -364,7 +379,7 @@ int main() {
 			clock.eventInterrupt = false;
 
 			// Debug LED aus
-			PORTH.OUTCLR = _BV(3);
+			DEBUG_LED(0);
 		}
 
 #		ifdef DISPLAY
@@ -375,10 +390,12 @@ int main() {
 //		display.write(2, 8, "m3: ")->writeInt(perc)->write("%  ");
 		//perc = ((int32_t)(motor.m[1] - zero) * 100) / (maxPower - zero);
 		perc = ((int32_t)motor.m[1] * 100) / max;
-		display.write(3, 0, "m1: ")->writeInt(perc)->write("%  ");
+		display.write(3, 0, "m1: ");
+		displayO.writeInt(perc)->write("%  ");
 		//perc = ((int32_t)(motor.m[3] - zero) * 100) / (maxPower - zero);
 		perc = ((int32_t)motor.m[3] * 100) / max;
-		display.write(3, 8, "m3: ")->writeInt(perc)->write("%  ");
+		display.write(3, 8, "m3: ");
+		displayO.writeInt(perc)->write("%  ");
 #		endif
 	}
 }
@@ -500,20 +517,7 @@ int main() {
 	useInterruptPriorities();
 	_delay_ms(500);
 
-	// Debuggig-Taster und -LED
-	PORTH.DIR = _BV(1) | _BV(2) | _BV(3);
-	PORTH.PIN0CTRL = PORT_OPC_PULLDOWN_gc;
-
-	PORTH.PIN3CTRL = PORT_OPC_WIREDOR_gc;
-
-	PORTH.PIN1CTRL = PORT_OPC_WIREDOR_gc;	//Setzt PIN1 fest auf Vcc
-	PORTH.OUTSET = _BV(1);
-
-	PORTH.PIN2CTRL = PORT_OPC_WIREDAND_gc;	//Setzt PIN2 fest auf GND
-	PORTH.OUTCLR = _BV(2);
-
-	PORTH.OUTCLR = _BV(3);
-	//Ende Debugging-Taster und -LED
+	DEBUG_init();
 
 	Display display(PORTC);
 	//Display display(PORT_FROM_NUMBER(2));
@@ -533,7 +537,7 @@ int main() {
 
 	display.clear();
 
-	PORTH.OUTSET = _BV(3);
+	DEBUG_LED(1);
 
 	uint8_t i = 0;
 	for (;;) {
