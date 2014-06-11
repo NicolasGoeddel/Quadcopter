@@ -32,6 +32,11 @@
  * Programm erhalten haben. Wenn nicht, siehe <http://www.gnu.org/licenses/>.
  */
 
+/**
+ * Siehe: http://stackoverflow.com/questions/920500/what-is-the-purpose-of-cxa-pure-virtual
+ */
+extern "C" void __cxa_pure_virtual() { while (1); }
+
 #include <stdlib.h>
 #include <util/delay.h>
 #include <avr/io.h>
@@ -300,7 +305,7 @@ int main() {
 
 #			ifdef BLUETOOTH
 			if (remote.getButton(Transmitter::btnFire)) {
-				bt.writeString("Fire!\r\n");
+				bt.write("Fire!\r\n");
 			}
 			if (remote.getButton(Transmitter::btnTop)) {
 				bt.writeFloatRaw(NAN);

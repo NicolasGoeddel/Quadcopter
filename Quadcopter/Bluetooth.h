@@ -12,6 +12,7 @@
 #include "USART.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include "OutDevice.h"
 
 /**
  * Diese Klasse nutzt den USART (aktuell noch ohne Klassenstruktur)
@@ -23,7 +24,7 @@
  * Werk aus die Baudrate 9600 nutzt. Das heißt beim ersten Mal sollte
  * man die Klasse mit der Baudrate 9600 initialisieren.
  */
-class Bluetooth {
+class Bluetooth : public OutDevice<Bluetooth> {
 	public:
 		/**
 		 * Erstelle ein Objekt der Bluetooth-Klasse mit einer bestimmten
@@ -46,6 +47,8 @@ class Bluetooth {
 		 */
 		bool setBaud(uint32_t baud);
 
+		using OutDevice<Bluetooth>::write;
+
 		/**
 		 * Wenn der Bluetooth-Adapter verbunden ist, wird dadurch
 		 * ein Zeichen an den Empfänger gesendet. Ist er nicht verbunden
@@ -53,50 +56,10 @@ class Bluetooth {
 		 *
 		 * @param c Das zu sendende Zeichen.
 		 */
-		void writeChar(char c) {
+		Bluetooth* write(const char c) {
 			USART_putchar(c);
+			return this;
 		}
-
-		/**
-		 * Schreibt eine Fließkommazahl mit einer Genauigkeit von 4
-		 * Nachkommastellen als Dezimalzahl zum Bluetooth-Adapter.
-		 *
-		 * @param f Der zu sendende Floatwert.
-		 */
-		void writeFloat(float f) {
-			char fstr[8];
-
-			dtostrf(f, 8, 4, fstr);
-			writeString(fstr);
-		}
-
-		/**
-		 * Schreibt eine Fließkommazahl binär zum Bluetooth-Adapter.
-		 * Damit kann man die volle Genauigkeit beibehalten und braucht
-		 * dennoch nur 4 Bytes für die Übertragung.
-		 *
-		 * @param f Der zu sendende Floatwert.
-		 */
-		void writeFloatRaw(float f) {
-			union {
-			    unsigned char c[4];
-			    float f;
-			} pun;
-
-			pun.f = f;
-			writeChar(pun.c[0]);
-			writeChar(pun.c[1]);
-			writeChar(pun.c[2]);
-			writeChar(pun.c[3]);
-		}
-
-		/**
-		 * Schreibt einen kompletten String zum Bluetooth-Adapter.
-		 *
-		 * @param s Der zu sendende String.
-		 * @return Die Anzahl an Zeichen, die gesendet wurden.
-		 */
-		uint8_t writeString(const char* s);
 
 		/**
 		 * Liest ein Zeichen vom Bluetooth-Adapter. Kann nichts

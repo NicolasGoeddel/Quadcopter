@@ -11,16 +11,6 @@ Bluetooth::Bluetooth(uint32_t baud) {
 	USART_init(baud);
 }
 
-uint8_t Bluetooth::writeString(const char* s) {
-	uint8_t length = 0;
-	while (*s) {
-		writeChar(*s);
-		s++;
-		length++;
-	}
-	return length;
-}
-
 void Bluetooth::getString(char* buffer, uint8_t length) {
 	while (length) {
 		*buffer = getChar();
@@ -36,15 +26,15 @@ void Bluetooth::getString(char* buffer, uint8_t length) {
 }
 
 void Bluetooth::changeDeviceName(const char* deviceName) {
-	writeString("AT+NAME");
-	uint8_t length = writeString(deviceName) + 2;
-	while (length--) {
+	write("AT+NAME")->write(deviceName);
+	while (*deviceName) {
 		getChar();
+		deviceName++;
 	}
 }
 
 bool Bluetooth::isDeviceOk() {
-	writeString("AT");
+	write("AT");
 	if (getChar() != 'O') {
 		return false;
 	}
@@ -55,10 +45,13 @@ bool Bluetooth::isDeviceOk() {
 }
 
 bool Bluetooth::setBaud(uint32_t baud) {
-	char* command = "AT+BAUD4";
+	// Standardbefehl
+	char command[] = "AT+BAUD4";
 	char p = '4';
+
 	// Gibt die höchste Stelligkeit der Baudrate an.
 	uint32_t h = 1000;
+
 	// Wähle entsprechende Nummer laut Datenblatt
 	switch (baud) {
 		case 1200:    p = '1'; h = 1000; break;
@@ -77,7 +70,7 @@ bool Bluetooth::setBaud(uint32_t baud) {
 			return false;
 	}
 	command[7] = p;
-	writeString(command);
+	write(command);
 
 	/* Überprüfe Rückgabewert, OK<r>, wobei <r> gleich die Baudrate
 	 * in Dezimalform sein muss

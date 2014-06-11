@@ -50,7 +50,7 @@
 
 #include <avr/io.h>
 #include <util/delay.h>
-#include <stdlib.h>      // wg. itoa
+
 #include "OutDevice.h"
 
 	// display commands
@@ -123,7 +123,7 @@
 
 //#define Display_delay for (uint8_t i = 0; i < 254; i++) { asm("nop"); }
 
-class Display : OutDevice<Display> {
+class Display : public OutDevice<Display> {
 	private:
 		PORT_t * port;
 
@@ -192,87 +192,26 @@ class Display : OutDevice<Display> {
 			_delay_ms(10);
 		}
 
-		void setCursorPos(uint8_t row, uint8_t column) {
+		Display* setCursorPos(uint8_t row, uint8_t column) {
 			send(_BV(IOC1) | _BV(IOC2), column + (row * 40));
-		}
-
-		Display* write(const char c) {
-			send(_BV(IOC2), c);
 			return this;
 		}
-
-//		Display* write(const char * c) {
-//			while (*c) {
-//				write(*c++);
-//			}
-//			return this;
-//		}
 
 		void clear() {
 			send(0, LCD_CMD_CLEARCURSORDATAADDRHOME);
 			setCursorPos(0, 0);
 		}
 
+		using OutDevice<Display>::write;
+
+		Display* write(const char c) {
+			send(_BV(IOC2), c);
+			return this;
+		}
+
 		Display* write(const uint8_t row, const uint8_t column, const char* text) {
 			setCursorPos(row, column);
 			write(text);
-			return this;
-		}
-
-//		Display* writeInt(const int16_t i) {
-//			char buf[8];
-//			ltoa(i, buf, 10);
-//			write(buf);
-//			return this;
-//		}
-
-		Display* writeInt4(const int16_t i) {
-			if (i >= 0) write(' ');
-			int16_t j = (i < 0) ? -i : i;
-			if (j < 100) write(' ');
-			if (j < 10) write(' ');
-			char buf[8];
-			ltoa(i, buf, 10);
-			write(buf);
-			return this;
-		}
-
-		Display* writeInt4x3(const int16_t x, const int16_t y, const int16_t z) {
-			writeInt4(x);
-			write(',');
-			writeInt4(y);
-			write(',');
-			writeInt4(z);
-			return this;
-		}
-
-		Display* writeInt(const uint8_t row, const uint8_t column, const int16_t i) {
-			setCursorPos(row, column);
-			writeInt(i);
-			return this;
-		}
-
-		Display* writeUint(const uint16_t i) {
-			char buf[7];
-			ultoa(i, buf, 10);
-			write(buf);
-			return this;
-		}
-
-		Display* writeFloat(float f) {
-			char fstr[8];
-
-			dtostrf(f, 8, 4, fstr);
-			write(fstr);
-			return this;
-		}
-
-		Display* writeUint3(const uint16_t i) {
-			if (i < 100) write(' ');
-			if (i < 10) write(' ');
-			char buf[7];
-			ultoa(i, buf, 10);
-			write(buf);
 			return this;
 		}
 
@@ -282,12 +221,6 @@ class Display : OutDevice<Display> {
 			writeUint3(y);
 			write(',');
 			writeUint3(z);
-			return this;
-		}
-
-		Display* writeUInt(const uint8_t row, const uint8_t column, const uint16_t i) {
-			setCursorPos(row, column);
-			writeUint(i);
 			return this;
 		}
 };
