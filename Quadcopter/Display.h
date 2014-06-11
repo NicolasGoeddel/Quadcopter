@@ -51,6 +51,7 @@
 #include <avr/io.h>
 #include <util/delay.h>
 #include <stdlib.h>      // wg. itoa
+#include "OutDevice.h"
 
 	// display commands
 #define LCD_CMD_SETFUNCTIONMODE          0xc0  // SF
@@ -122,7 +123,7 @@
 
 //#define Display_delay for (uint8_t i = 0; i < 254; i++) { asm("nop"); }
 
-class Display {
+class Display : OutDevice<Display> {
 	private:
 		PORT_t * port;
 
@@ -195,16 +196,17 @@ class Display {
 			send(_BV(IOC1) | _BV(IOC2), column + (row * 40));
 		}
 
-		Display* write(const char * c) {
-			while (*c) {
-				write(*c++);
-			}
+		Display* write(const char c) {
+			send(_BV(IOC2), c);
 			return this;
 		}
 
-		void write(char c) {
-			send(_BV(IOC2), c);
-		}
+//		Display* write(const char * c) {
+//			while (*c) {
+//				write(*c++);
+//			}
+//			return this;
+//		}
 
 		void clear() {
 			send(0, LCD_CMD_CLEARCURSORDATAADDRHOME);
@@ -217,18 +219,18 @@ class Display {
 			return this;
 		}
 
-		Display* writeInt(const int16_t i) {
-			char buf[8];
-			ltoa(i, buf, 10);
-			write(buf);
-			return this;
-		}
+//		Display* writeInt(const int16_t i) {
+//			char buf[8];
+//			ltoa(i, buf, 10);
+//			write(buf);
+//			return this;
+//		}
 
 		Display* writeInt4(const int16_t i) {
-			if (i >= 0) write(" ");
+			if (i >= 0) write(' ');
 			int16_t j = (i < 0) ? -i : i;
-			if (j < 100) write(" ");
-			if (j < 10) write(" ");
+			if (j < 100) write(' ');
+			if (j < 10) write(' ');
 			char buf[8];
 			ltoa(i, buf, 10);
 			write(buf);
@@ -237,9 +239,9 @@ class Display {
 
 		Display* writeInt4x3(const int16_t x, const int16_t y, const int16_t z) {
 			writeInt4(x);
-			write(",");
+			write(',');
 			writeInt4(y);
-			write(",");
+			write(',');
 			writeInt4(z);
 			return this;
 		}
@@ -266,8 +268,8 @@ class Display {
 		}
 
 		Display* writeUint3(const uint16_t i) {
-			if (i < 100) write(" ");
-			if (i < 10) write(" ");
+			if (i < 100) write(' ');
+			if (i < 10) write(' ');
 			char buf[7];
 			ultoa(i, buf, 10);
 			write(buf);
@@ -276,9 +278,9 @@ class Display {
 
 		Display* writeUint3x3(const uint16_t x, const uint16_t y, const uint16_t z) {
 			writeUint3(x);
-			write(",");
+			write(',');
 			writeUint3(y);
-			write(",");
+			write(',');
 			writeUint3(z);
 			return this;
 		}

@@ -29,6 +29,7 @@
  *               either too high or too low.)
  */
 bool USART_setBaudrate(USART_t *usart, uint32_t baud, uint32_t cpu_hz);
+void USART_setBaudrate(uint32_t baudrate);
 
 void USART_init(uint32_t baud);
 

@@ -134,6 +134,10 @@ void USART_init(uint32_t baud) {
 	USART_setBaudrate(&USART_PORT, baud, F_CPU);
 }
 
+void USART_setBaudrate(uint32_t baudrate) {
+	USART_setBaudrate(&USART_PORT, baudrate, F_CPU);
+}
+
 void USART_putchar(uint8_t c) {
 	while(!(USART_PORT.STATUS & USART_DREIF_bm));
 

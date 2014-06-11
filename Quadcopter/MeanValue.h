@@ -35,6 +35,10 @@ class MeanValue {
 		 */
 		SumType sum;
 
+		/**
+		 * Der Ringpuffer für alle Werte, über die gemittelt werden
+		 * soll.
+		 */
 		ValueType* buffer;
 	public:
 		MeanValue(CapacityType capacity) {

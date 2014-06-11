@@ -43,6 +43,11 @@
 #include "myMath.h"
 #include <avr/interrupt.h>
 
+/**
+ * Wenn USE_OFFSET auf 1 steht, dann werden die Hardware-Offsets benutzt,
+ * andernfalls wird der Bias softwaremäßig berechnet.
+ */
+
 #define USE_OFFSET 0
 
 //*******************************************************
@@ -555,15 +560,15 @@ class ADXL345 {
 				 * brechen und noch die eingestellte Range beachten.
 				 */
 #if USE_OFFSET
-//				offset[i] = -offset[i] / (256 / (range / 2));
-//				if (offset[i] > 127) {
-//					error = true;
-//					offset[i] = 127;
-//				} else if (offset[i] < -128) {
-//					error = true;
-//					offset[i] = -128;
-//				}
-//				offset8[i] = offset[i];
+				offset[i] = -offset[i] / (256 / (range / 2));
+				if (offset[i] > 127) {
+					error = true;
+					offset[i] = 127;
+				} else if (offset[i] < -128) {
+					error = true;
+					offset[i] = -128;
+				}
+				offset8[i] = offset[i];
 #endif
 			}
 
