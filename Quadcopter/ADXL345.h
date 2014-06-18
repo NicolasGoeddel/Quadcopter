@@ -136,7 +136,7 @@ class ADXL345 {
 		 * Deklariere die SPI-Klasse, die benutzt werden soll. In diesem
 		 * Fall ist es eine Software-SPI.
 		 */
-		SPI<SCLK, MISO, MOSI, 10> spi;
+		SPI<SCLK, MISO, MOSI, 0> spi;
 
 		/**
 		 * Port, an dem der ADXL345 angeschlossen ist.

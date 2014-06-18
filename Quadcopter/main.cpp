@@ -254,7 +254,7 @@ int main() {
 			DEBUG_LED(1);
 
 			// Gyro und Beschleunigungssensor auslesen
-			gyro.measureSmooth();
+			gyro.measure();
 			acc.measureSmooth();
 
 			// Beschleunigung "normalisieren"

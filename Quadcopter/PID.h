@@ -38,70 +38,13 @@
 #include <avr/io.h>
 #include "math.h"
 
-#define RATE_XAXIS_PID_IDX          0
-#define RATE_YAXIS_PID_IDX          1
-#define ZAXIS_PID_IDX               2
-#define ATTITUDE_XAXIS_PID_IDX      3
-#define ATTITUDE_YAXIS_PID_IDX      4
-#define HEADING_HOLD_PID_IDX        5
-#define ATTITUDE_GYRO_XAXIS_PID_IDX 6
-#define ATTITUDE_GYRO_YAXIS_PID_IDX 7
-#define ALTITUDE_HOLD_PID_IDX       8
-#define ZDAMPENING_PID_IDX          9
-
-// This struct above declares the variable PID[] to hold each of the PID values for various functions
-// The following constants are declared in AeroQuad.h
-// ROLL = 0, PITCH = 1, YAW = 2 (used for Arcobatic Mode, gyros only)
-// ROLLLEVEL = 3, PITCHLEVEL = 4, LEVELGYROROLL = 6, LEVELGYROPITCH = 7 (used for Stable Mode, accels + gyros)
-// HEADING = 5 (used for heading hold)
-// ALTITUDE = 8 (used for altitude hold)
-// ZDAMPENING = 9 (used in altitude hold to dampen vertical accelerations)
-
-/*
-class PID {
-		struct PIDdata {
-			float P, I, D;
-			float lastPosition;
-			float previousPIDTime;
-			float integratedError;
-			float windupGuard;
-		} pid[10];
-
-		float windupGuard; //Read in from EEPROM
-		float currentTime;
-	public:
-		PID() {
-			windupGuard = 0.0;
-			currentTime = 0.0;
-		}
-		~PID() {}
-
-		float updatePID(float targetPosition, float currentPosition, PIDdata * PIDparameters) {
-			  // AKA PID experiments
-			  const float deltaPIDTime = (currentTime - PIDparameters->previousPIDTime) / 1000000.0;
-
-			  PIDparameters->previousPIDTime = currentTime;  // AKA PID experiments
-			  float error = targetPosition - currentPosition;
-
-			  PIDparameters->integratedError += error * deltaPIDTime;
-			  PIDparameters->integratedError = constrain(PIDparameters->integratedError, -PIDparameters->windupGuard, PIDparameters->windupGuard);
-			  float dTerm = PIDparameters->D * (currentPosition - PIDparameters->lastPosition) / (deltaPIDTime * 100); // dT fix from Honk
-			  PIDparameters->lastPosition = currentPosition;
-			  return (PIDparameters->P * error) + (PIDparameters->I * (PIDparameters->integratedError)) + dTerm;
-		}
-		void zeroIntegralError() {
-			for (uint8_t axis = 0; axis < ATTITUDE_YAXIS_PID_IDX; axis++) {
-				pid[axis].integratedError = 0.0;
-				pid[axis].previousPIDTime = currentTime;
-			}
-		}
-};
-*/
-
-//#define OLD_IMPLEMENTATION
+/**
+ * Auf 1 setzen, wenn die alte Implementierung benutzt werden soll.
+ */
+#define USE_OLD_IMPLEMENTATION 0
 
 class PID {
-#ifndef OLD_IMPLEMENTATION
+#if not USE_OLD_IMPLEMENTATION
 	private:
 		float iState;	// Integrator state
 		// Maximum and minimum allowable integrator state
