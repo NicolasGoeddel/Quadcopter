@@ -32,8 +32,8 @@
  * Programm erhalten haben. Wenn nicht, siehe <http://www.gnu.org/licenses/>.
  */
 
-#ifndef COMPLEMENTARYFILTER_H_
-#define COMPLEMENTARYFILTER_H_
+#ifndef CFILTER_H_
+#define CFILTER_H_
 
 class CFilter {
 	private:
@@ -69,4 +69,4 @@ class CFilter {
 		}
 };
 
-#endif /* COMPLEMENTARYFILTER_H_ */
+#endif /* CFILTER_H_ */

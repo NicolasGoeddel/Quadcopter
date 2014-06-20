@@ -47,6 +47,7 @@ class MeanValue {
 			filled = 0;
 			sum = 0;
 			buffer = (ValueType*) malloc(capacity * sizeof(ValueType));
+			fillBuffer(0);
 		}
 		MeanValue(CapacityType capacity) {
 			this->capacity = capacity;
@@ -54,6 +55,7 @@ class MeanValue {
 			filled = 0;
 			sum = 0;
 			buffer = (ValueType*) malloc(capacity * sizeof(ValueType));
+			fillBuffer(0);
 		}
 		~MeanValue() {
 			free(buffer);
@@ -77,6 +79,7 @@ class MeanValue {
 				return (buffer != 0) ? 1 : 2;
 			}
 			this->capacity = capacity;
+			fillBuffer(0);
 			return 0;
 		}
 

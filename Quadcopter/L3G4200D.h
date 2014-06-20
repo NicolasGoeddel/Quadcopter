@@ -36,6 +36,7 @@
 #define L3G4200D_H_
 
 #include "timer.h"
+#include "myMath.h"
 
 /*
  * Includefile for Gyrometer L3G4200
@@ -73,6 +74,13 @@
 
 #define GYRO_RW_BIT			0x80
 #define GYRO_MS_BIT			0x40
+
+//CTRL_REG1
+#define GYRO_PD_NormalMode	_BV(3)
+#define GYRO_PD_PowerDown	0
+#define GYRO_X_Axis_Enable	_BV(0)
+#define GYRO_Y_Axis_Enable	_BV(1)
+#define GYRO_Z_Axis_Enable	_BV(2)
 
 
 #include <stdlib.h>
@@ -139,6 +147,24 @@ class L3G4200D {
 		}
 
 	public:
+		enum Bandwidth {
+			Bandwidth_100 = (0b00 << 6),
+			Bandwidth_200 = (0b01 << 6),
+			Bandwidth_400 = (0b10 << 6),
+			Bandwidth_800 = (0b11 << 6)
+		};
+
+		enum CutOff {
+			CutOff_12_5 = (0b00 << 4),
+			CutOff_20   = (0b00 << 4),
+			CutOff_30   = (0b00 << 4),
+			CutOff_25   = (0b01 << 4),
+			CutOff_35   = (0b01 << 4),
+			CutOff_50   = (0b10 << 4),
+			CutOff_70   = (0b11 << 4),
+			CutOff_110  = (0b11 << 4)
+		};
+
 		int16_t gyroZero[3];
 		L3G4200D(PORT_t & PORT) : spi(PORT) {
 			port = &PORT;
@@ -154,7 +180,8 @@ class L3G4200D {
 			gyroLastMeasuredTime = 0;
 			gyroSampleCount = 0;
 			gyroHeading = 0.0;
-			gyroScaleFactor = 0.007;
+			// Umrechnung für Fullscale select 2000 dps
+			gyroScaleFactor = 2000.0 * M_PI / (32768.0 * 180.0);
 
 			smoothCount = 0;
 			smoothIndex = 0;
@@ -198,8 +225,12 @@ class L3G4200D {
 			return (read(GYRO_WHO_AM_I) == 0b11010011);
 		}
 
+		void setBandwidth(Bandwidth bandwith, CutOff cutOff) {
+			write(GYRO_CTRL_REG1, bandwith | cutOff | GYRO_PD_NormalMode | GYRO_X_Axis_Enable | GYRO_Y_Axis_Enable | GYRO_Z_Axis_Enable);
+		}
+
 		void setDefaults() {
-			write(GYRO_CTRL_REG1, 0b01101111);	//ODR=100Hz, Cut-Off: 12.5
+			setBandwidth(Bandwidth_100, CutOff_12_5);
 			write(GYRO_CTRL_REG2, 0b00000000);
 			write(GYRO_CTRL_REG3, 0b00000000);
 			write(GYRO_CTRL_REG4, 0b10110000);	//Full Scale Selection:2000dps
@@ -245,8 +276,7 @@ class L3G4200D {
 		}
 
 		void calibrate() {
-			int32_t zero[3];
-			zero[0] = zero[1] = zero[2] = 0;
+			int32_t zero[3] = {0, 0, 0};
 
 			for (uint8_t i = 0; i < 100; i++) {
 				int16_t x, y, z;

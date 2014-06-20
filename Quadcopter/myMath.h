@@ -35,12 +35,20 @@
 #ifndef MATH_H_
 #define MATH_H_
 
+//#define POLYNOM0 (x, a) ((a)[0])
 //#define POLYNOM1 (x, a) ((a)[1] * (x) + (a)[0])
 //#define POLYNOM2 (x, a) (POLYNOM1((x), (a) + 1) * (x) + (a)[0])
 //#define POLYNOM3 (x, a) (POLYNOM2((x), (a) + 1) * (x) + (a)[0])
 //#define POLYNOM4 (x, a) (POLYNOM3((x), (a) + 1) * (x) + (a)[0])
 
 #define ENV_G 9.8065
+
+#ifndef M_PI
+	#define M_PI 3.14159265358979323846264338327950288
+#endif
+#ifndef M_PI_2
+	#define M_PI_2 1.57079632679489661923132169163975144
+#endif
 
 struct Vector {
 	float x;
@@ -50,10 +58,10 @@ struct Vector {
 
 template<class T>
 const T& constrain(const T& x, const T& a, const T& b) {
-    if(x < a) {
+    if (x < a) {
         return a;
     }
-    else if(b < x) {
+    else if (x > b) {
         return b;
     }
     else

@@ -104,6 +104,8 @@ struct Motor_t {
 		}
 };
 
+#define DEG(a) (a * 57.295779579)
+
 Motor_t motor(0);
 
 #ifdef DEBUG_TEST
@@ -159,7 +161,7 @@ int main() {
 			//display.write(1, 0, "ACC:")->writeInt(acc.getOffset32(0))->write(",")->writeInt(acc.getOffset32(1))->write(",")->writeInt(acc.getOffset32(2));
 			display.setCursorPos(1, 0)->write("ACC:")->writeInt(acc.getOffset(0))->write(",")->writeInt(acc.getOffset(1))->write(",")->writeInt(acc.getOffset(2));
 		}
-		acc.setSmooth(5);
+		acc.setSmooth(10);
 	}
 
 	// Initialisiere Gyro
@@ -211,7 +213,7 @@ int main() {
 	uint16_t zero     = ((uint32_t) max * 10 / 100);		// 10%
 	uint16_t standby  = ((uint32_t) max * 125 / 1000);		// 12.5%
 	uint16_t power    = ((uint32_t) max * 130 / 1000);		// 13%
-	uint16_t maxPower = ((uint32_t) max * 175 / 1000);		// 17.5%
+	uint16_t maxPower = ((uint32_t) max * 165 / 1000);		// 17.5%
 	uint16_t speed    = zero;
 
 	/*float x, y, z;
@@ -228,16 +230,16 @@ int main() {
 	#define PID_I_Min -5.0
 	#define PID_I_Max 5.0
 	#define PID_I_Band 10.0
-	#define PID_Scale 0.06
+	#define PID_Scale 0.12
 	PID pidX(PID_P * PID_Scale, PID_I * PID_Scale, PID_D * PID_Scale, dT);
 	pidX.setIBand(PID_I_Band, PID_I_Min, PID_I_Max);
 	PID pidY(PID_P * PID_Scale, PID_I * PID_Scale, PID_D * PID_Scale, dT);
 	pidY.setIBand(PID_I_Band, PID_I_Min, PID_I_Max);
 
-	CFilter filterX(0.035, dT);
-	CFilter filterY(0.035, dT);
+	CFilter filterX(0.045, dT);
+	CFilter filterY(0.045, dT);
 
-	float angleX, angleY;
+	float angleX, angleY, angleZ = 0.0;
 	float pidAngleX, pidAngleY;
 	float accZ = 0.0;
 	float speedZ = 0.0;
@@ -255,7 +257,7 @@ int main() {
 
 			// Gyro und Beschleunigungssensor auslesen
 			gyro.measure();
-			acc.measureSmooth();
+			acc.measure();
 
 			// Beschleunigung "normalisieren"
 			accZ = (-acc.z() - ENV_G);
@@ -266,6 +268,7 @@ int main() {
 			// Winkel aus Beschleunigung und Gyro berechnen
 			angleX = filterX(acc.angleX(), gyro.x());
 			angleY = filterY(acc.angleY(), gyro.y());
+			angleZ += gyro.z() * dT;
 
 			// Fernbedienung auslesen
 			uint8_t remoteX, remoteY, remoteState, remotePushed;
@@ -285,8 +288,8 @@ int main() {
 			/* Linearität der X-Y-Werte aufheben: f(x) = (x^3 + x/2) / 1.5
 			 * Das macht kleine Auslenkungen genau und größere stärker.
 			 */
-			rX = rX * (rX * rX + 0.5) * 0.666666;
-			rY = rY * (rY * rY + 0.5) * 0.666666;
+			//rX = rX * (rX * rX + 0.5) * 0.666666;
+			//rY = rY * (rY * rY + 0.5) * 0.666666;
 
 			// X-Y-Werte auf MAX_ANGLE_RAD strecken
 			rX *= MAX_ANGLE_RAD;
@@ -302,8 +305,9 @@ int main() {
 			// Debug-Infos ausgeben
 #			ifdef DISPLAY
 			display.setCursorPos(0, 0)->write("a:")->writeInt4x3(acc.x() * 100, acc.y() * 100, acc.z() * 100);
-			display.setCursorPos(1, 0)->write("g:")->writeInt4x3(gyro.x() * 100, gyro.y() * 100, gyro.z() * 100);
-			display.setCursorPos(2, 0)->write("f:")->writeInt4x3(angleX * 57.295779579, angleY * 57.295779579, remoteState);
+			display.setCursorPos(1, 0)->write("w:")->writeInt4x3(DEG(angleX), DEG(angleY), DEG(angleZ));
+//			display.setCursorPos(2, 0)->write("p:")->writeInt4x3(DEG(pidAngleX), DEG(pidAngleY), DEG(angleZ));
+			display.setCursorPos(2, 0)->write("g:")->writeInt4x3(DEG(gyro.x()), DEG(gyro.y()), DEG(gyro.z()));
 //			display.setCursorPos(2, 0)->write("r:")->writeInt4x3(remoteX, remoteY, remoteState);
 #			endif
 
@@ -312,17 +316,26 @@ int main() {
 				bt.write("Fire!\r\n");
 			}
 			if (remote.getButton(Transmitter::btnTop)) {
-				bt.writeFloatRaw(NAN);
-				bt.writeFloatRaw(acc.x());
-				bt.writeFloatRaw(acc.y());
-				bt.writeFloatRaw(acc.z());
-				bt.writeFloatRaw(gyro.x());
-				bt.writeFloatRaw(gyro.y());
-				bt.writeFloatRaw(gyro.z());
+				bt.write("a:")->writeFloat(acc.x())->writeFloat(acc.y())->writeFloat(acc.z());
+				bt.write(" g:")->writeFloat(gyro.x())->writeFloat(gyro.y())->writeFloat(gyro.z());
+				bt.writeChar(13);
+//				bt.writeFloatRaw(NAN);
+//				bt.writeFloatRaw(acc.x());
+//				bt.writeFloatRaw(acc.y());
+//				bt.writeFloatRaw(acc.z());
+//				bt.writeFloatRaw(gyro.x());
+//				bt.writeFloatRaw(gyro.y());
+//				bt.writeFloatRaw(gyro.z());
 			}
 #			endif
 
-			//z = pidFilterX(16384, x);
+			if (DEBUG_Button()) {
+				speed = standby;
+#			ifndef REMOTE
+			} else {
+				speed = zero;
+#			endif
+			}
 
 #			ifdef REMOTE
 			if (remote.getButton(Transmitter::btnFire) || (DEBUG_Button())) {
@@ -354,8 +367,8 @@ int main() {
 
 			if (speed != zero) {
 				// Motormischer
-				motor.m[0] = speed + pwmY;
-				motor.m[2] = speed - pwmY;
+				motor.m[0] = speed - pwmY;
+				motor.m[2] = speed + pwmY;
 				motor.m[1] = speed + pwmX;
 				motor.m[3] = speed - pwmX;
 				motor.cutBorders(0, maxPower);

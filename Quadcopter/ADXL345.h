@@ -44,9 +44,26 @@
 #include <avr/interrupt.h>
 #include "MeanValue.h"
 
+/* PACKAGE
+ *
+ * +---------+
+ * | o       |         △ +x
+ * | 3 4 5 B |         ⎟
+ * | # y w w |   +y    ⎟
+ * | v v v v |   ◁⎯⎯⎯⎯⎯◎     z geht aus der Ebene raus.
+ * | C N T Y |
+ * +---------+
+ *
+ * Wenn der Pfeil Richtung Erde zeigt, sollte die Beschleunigung -9,81 m/s² betragen.
+ *
+ */
+
 /**
  * Wenn USE_OFFSET auf 1 steht, dann werden die Hardware-Offsets benutzt,
- * andernfalls wird der Bias softwaremäßig berechnet.
+ * andernfalls wird der Bias softwaremäßig berechnet. Wir benutzen die
+ * Möglichkeit mit den Offset-Register im ADXL345 nicht, da sie scheinbar
+ * nicht korrekt geschrieben oder gelesen werden können. Entweder ist unser
+ * Chip kaputt oder es liegt an anderen unerklärlichen Gründen.
  */
 
 #define USE_OFFSET 0
@@ -105,6 +122,12 @@
 #define ACC_DOUBLE_TAP		_BV(5)
 #define ACC_SINGLE_TAP		_BV(6)
 #define ACC_DATA_READY		_BV(7)
+
+//FIFO Modes
+#define ACC_FIFO_Bypass		0
+#define ACC_FIFO_FIFO		_BV(6)
+#define ACC_FIFO_Stream		_BV(7)
+#define ACC_FIFO_Trigger	(_BV(6) | _BV(7))
 
 //Data Format Bits
 #define ACC_RANGE_0			_BV(0)
@@ -179,6 +202,23 @@ class ADXL345 {
 		int8_t offset8[3];
 
 		/**
+		 * Wenn diese Variable auf true steht, dann wird der FIFO-Puffer
+		 * benutzt, indem alle im FIFO enthaltenen Werte ausgelesen und
+		 * gemittelt werden. So kann man die Samplerate maximal 32 mal
+		 * höher setzen als die Geschwindigkeit, mit der man measure()
+		 * bzw. measureSmooth() aufruft. Auf diese Weise verliert man auch
+		 * keine Werte, die bei einer Auslesefrequenz, die niedriger als
+		 * die SampleRate ist, verloren gingen.
+		 * Standardmäßig ist dieser Wert false und muss mit enableFIFO(true)
+		 * zunächst auf true gesetzt werden. Mit enableFIFO(false) kann man
+		 * den FIFO wieder deaktivieren.
+		 * Genauer gesagt wird hier der Stream-Mode aus dem Datenblatt
+		 * benutzt, da der beim Überlaufen des FIFOs immer die aktuellsten
+		 * Werte beinhaltet.
+		 */
+		bool useFIFO;
+
+		/**
 		 * Die Geschwindigkeit, in der intern neue Samples acquiriert werden
 		 * in Hz.
 		 */
@@ -201,6 +241,15 @@ class ADXL345 {
 			SampleRate_0_10	= 0b0000 //!< SampleRate_0_10
 		};
 		uint16_t sampleRate;
+
+		struct rawValue {
+				union {
+						int16_t x;
+						int16_t y;
+						int16_t z;
+						uint16_t raw;
+				};
+		};
 
 		/**
 		 * Gibt den Inhalt eines bestimmten Registers vom ADXL345 zurück.
@@ -248,26 +297,69 @@ class ADXL345 {
 		}
 
 		/**
-		 * Liest die Rohdaten der drei Achsen aus.
-		 * @param x Enthält nach dem Aufruf die Beschleunigung in Richtung X-Achse.
-		 * @param y Enthält nach dem Aufruf die Beschleunigung in Richtung Y-Achse.
-		 * @param z Enthält nach dem Aufruf die Beschleunigung in Richtung Z-Achse.
+		 * Liest die Rohdaten der drei Achsen aus den normalen
+		 * Registern aus.
+		 *
+		 * @param xyz Enthält nach dem Aufruf die Beschleunigung aller Achsen.
 		 */
-		void readXYZ(int16_t &x, int16_t &y, int16_t &z) {
+		void readData(int16_t* xyz) {
 			uint8_t read_address;
+			rawValue in;
 			read_address = ACC_RW_BIT | ACC_MB_BIT | ACC_DATAX0;
 
 			port->OUTCLR = _BV(CS);
 
 			spi.write(read_address);
-			x = spi.read();
-			x |= spi.read() << 8;
-			y = spi.read();
-			y |= spi.read() << 8;
-			z = spi.read();
-			z |= spi.read() << 8;
+			in.raw = spi.read();
+			in.raw |= spi.read() << 8;
+			xyz[0] = in.x;
+			in.raw = spi.read();
+			in.raw |= spi.read() << 8;
+			xyz[1] = in.y;
+			in.raw = spi.read();
+			in.raw |= spi.read() << 8;
+			xyz[2] = in.z;
 
 			port->OUTSET = _BV(CS);
+		}
+
+		/**
+		 * Liest die Rohdaten der drei Achsen aus den normalen
+		 * Registern aus und achtet bei aktiviertem FIFO-Puffer darauf
+		 * alle Werte aus dem Puffer zu lesen und zu mitteln, falls
+		 * mehr als einer drin steht.
+		 *
+		 * @param xyz Enthält nach dem Aufruf die Beschleunigung aller Achsen.
+		 */
+		void readXYZ(int16_t* xyz) {
+			if (!useFIFO) {
+				readData(xyz);
+				return;
+			}
+			uint8_t entries = read(ACC_FIFO_STATUS) & 0x3f; // Nur die letzten 6 Bits lesen
+			int32_t xyzSum[3] = {0, 0, 0};
+			/* Theoretisch könnte man hier auch einfach xyz wieder verwenden
+			 * und Stackspeicher sparen.
+			 */
+			int16_t xyzTmp[3];
+
+			for (uint8_t i = 0; i < entries; i++) {
+				readData(xyzTmp);
+				xyzSum[0] += xyzTmp[0];
+				xyzSum[1] += xyzTmp[1];
+				xyzSum[2] += xyzTmp[2];
+
+				/* Zwischen dem Auslesen einzelner Samples aus dem FIFO
+				 * müssen mindestens 5 µs gewartet werden. Nach dem
+				 * letzten Sample müssen wir allerdings nicht mehr warten.
+				 */
+				if (i < entries) {
+					_delay_us(5);
+				}
+			}
+			xyz[0] = xyzSum[0] / entries;
+			xyz[1] = xyzSum[1] / entries;
+			xyz[2] = xyzSum[2] / entries;
 		}
 #endif
 	public:
@@ -293,6 +385,8 @@ class ADXL345 {
 			sampleRate = SampleRate_100;
 			range = 2;
 			accelScaleFactor = ENV_G * (float)range / 32768.0;
+
+			enableFIFO(false);
 
 			_delay_ms(1);
 		}
@@ -359,6 +453,22 @@ class ADXL345 {
 		}
 
 		/**
+		 * Aktiviert oder deaktiviert den im ADXL345 enthaltenen FIFO-Puffer
+		 * und setzt ihn in den Stream-Modus, sodass immer die aktuellsten
+		 * Daten vorhanden sind, auch wenn der Puffer überläuft.
+		 *
+		 * @param state
+		 */
+		void enableFIFO(bool state = true) {
+			useFIFO = state;
+			if (state) {
+				write(ACC_FIFO_CTL, ACC_FIFO_Stream | 32);
+			} else {
+				write(ACC_FIFO_CTL, ACC_FIFO_Bypass | 32);
+			}
+		}
+
+		/**
 		 * Gibt die aktuelle Beschleunigung auf der X-Achse zurück.
 		 *
 		 * @return Beschleunigung auf der X-Achse.
@@ -389,7 +499,7 @@ class ADXL345 {
 		 * @return Drehwinkel um die X-Achse in Rad.
 		 */
 		float inline angleX() {	// returns 0 if z=1 and y=0
-			return -myAtan2(meterPerSecSec[1], -meterPerSecSec[2]);
+			return myAtan2(meterPerSecSec[1], meterPerSecSec[2]);
 		}
 		/**
 		 * Gibt den absoluten Drehwinkel um die Y-Achse in Rad an.
@@ -397,7 +507,7 @@ class ADXL345 {
 		 * @return Drehwinkel um die Y-Achse in Rad.
 		 */
 		float inline angleY() {
-			return myAtan2(meterPerSecSec[0], -meterPerSecSec[2]);
+			return -myAtan2(meterPerSecSec[0], meterPerSecSec[2]);
 		}
 		/**
 		 * Gibt den absoluten Drehwinkel um die Z-Achse in Rad an.
@@ -405,7 +515,7 @@ class ADXL345 {
 		 * @return Drehwinkel um die Z-Achse in Rad.
 		 */
 		float inline angleZ() { //TODO
-			return myAtan2(meterPerSecSec[1], meterPerSecSec[0]);
+			return -myAtan2(meterPerSecSec[1], meterPerSecSec[0]);
 		}
 
 		/**
@@ -418,9 +528,11 @@ class ADXL345 {
 		void setDefaults() {
 			write(ACC_POWER_CTL, 0);
 
-			setRange(4);
+			setRange(2);
 
-			setSampleRate(SampleRate_100);
+			setSampleRate(SampleRate_800);
+
+			enableFIFO(true);
 
 			write(ACC_POWER_CTL, ACC_MEASURE);	//Put the Accelerometer into measurement mode
 			_delay_ms(10);
@@ -444,7 +556,7 @@ class ADXL345 {
 		void measureSmooth() {
 			int16_t values[3];
 
-			readXYZ(values[0], values[1], values[2]);
+			readXYZ(values);
 
 			for (uint8_t axis = 0; axis < 3; axis++) {
 #if USE_OFFSET
@@ -461,18 +573,17 @@ class ADXL345 {
 		 * Werte lassen sich dann mit den passenden Gettern auslesen.
 		 */
 		void measure() {
-			int16_t x, y, z;
+			int16_t values[3];
 
-			readXYZ(x, y, z);
+			readXYZ(values);
+
+			for (uint8_t axis = 0; axis < 3; axis++) {
 #if USE_OFFSET
-			meterPerSecSec[0] = x * accelScaleFactor;
-			meterPerSecSec[1] = y * accelScaleFactor;
-			meterPerSecSec[2] = z * accelScaleFactor;
+				meterPerSecSec[axis] = values[axis] * accelScaleFactor;
 #else
-			meterPerSecSec[0] = (x - offset[0]) * accelScaleFactor;
-			meterPerSecSec[1] = (y - offset[1]) * accelScaleFactor;
-			meterPerSecSec[2] = (z - offset[2]) * accelScaleFactor;
+				meterPerSecSec[axis] = (values[axis] - offset[axis]) * accelScaleFactor;
 #endif
+			}
 		}
 
 		/**
@@ -486,8 +597,12 @@ class ADXL345 {
 		 */
 		bool calibrate() {
 			bool error = false;
+#if USE_OFFSET
 			// Setze Offsetregister auf 0
 			writeOffset(0, 0, 0);
+#endif
+
+			int16_t values[3];
 
 			// Berechne den Mittelwert über 100 Samples
 			accelSampleSum[0] = 0;
@@ -495,12 +610,11 @@ class ADXL345 {
 			accelSampleSum[2] = 0;
 			accelSampleCount = 0;
 			for (uint8_t samples = 0; samples < 100; samples++) {
-				int16_t x, y, z;
 
-				readXYZ(x, y, z);
-				accelSampleSum[0] += x;
-				accelSampleSum[1] += y;
-				accelSampleSum[2] += z;
+				readXYZ(values);
+				for (uint8_t axis = 0; axis < 3; axis++) {
+					accelSampleSum[axis] += values[axis];
+				}
 				accelSampleCount++;
 				_delay_ms(10);
 			}
@@ -512,7 +626,7 @@ class ADXL345 {
 				 */
 				offset[i] = accelSampleSum[i] / accelSampleCount;
 				if (i == 2) {
-					offset[2] += (32768 / range);
+					offset[2] -= (32768 / range);
 				}
 				//accZero[i] = offset[i];
 				/* Deswegen müssen wir die berechneten Offsets jetzt auf 8 Bit runter
@@ -543,8 +657,7 @@ class ADXL345 {
 			if (axis > 2) {
 				return 0;
 			}
-			//return offset8[axis];
-			return read(ACC_OFSX + axis);
+			return offset8[axis];
 		}
 
 		int32_t getOffset32(uint8_t axis) {

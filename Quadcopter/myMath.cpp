@@ -33,14 +33,10 @@
  */
 
 #include "myMath.h"
-//#include <math.h>
 #include <errno.h>
-//#include "localmath.h"
-
-#define M_PI 3.14159265358979323846264338327950288
-#define M_PI_2 1.57079632679489661923132169163975144
 
 // Alternate method to calculate arctangent from: http://www.dspguru.com/comp.dsp/tricks/alg/fxdatan2.htm
+/*
 float arctan2(float x, float y) {
 	float coeff_1 = 0.785398163;	//Pi / 4
 	float coeff_2 = 2.35619449;		//Pi * 3 / 4
@@ -51,8 +47,8 @@ float arctan2(float x, float y) {
 		r = (x - abs_y) / (x + abs_y);
 		angle = coeff_1 - coeff_1 * r;
 	} else {
-		r = (x + abs_y) / (abs_y - x);
-		angle = coeff_2 - coeff_1 * r;
+		r = (x + abs_y) / (x - abs_y);
+		angle = coeff_2 + coeff_1 * r;
 	}
 	if (y < 0) {
 		return -angle;
@@ -60,6 +56,7 @@ float arctan2(float x, float y) {
 		return angle;
 	}
 }
+*/
 
 /*
 float atan(double x) {
@@ -147,11 +144,11 @@ float myAtan2(float y, float x) {
 	}
 	absy = y < 0 ? -y : y;
 	absx = x < 0 ? -x : x;
-	if (absy - absx == absy) {
+	if (absx < 1e-10) {
 		/* x negligible compared to y */
 		return y < 0 ? -M_PI_2 : M_PI_2;
 	}
-	if (absx - absy == absx) {
+	if (absy < 1e-10) {
 		/* y negligible compared to x */
 		val = 0.0;
 	} else {

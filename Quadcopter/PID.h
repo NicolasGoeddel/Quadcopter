@@ -67,11 +67,20 @@ class PID {
 			this->dT = dT;
 		}
 		~PID() {};
+
 		void setIBand(float iBand, float iMin, float iMax) {
 			this->iBand = iBand;
 			this->iMin = iMin;
 			this->iMax = iMax;
+			iState = 0.0;
 		}
+
+		void setPID(float p, float i, float d) {
+			iGain = i;
+			pGain = p;
+			dGain = d;
+		}
+
 		float operator()(float error) {
 			// calculate the integral state with approriate limiting
 			float iState = 0.0;
