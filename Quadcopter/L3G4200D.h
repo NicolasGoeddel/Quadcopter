@@ -35,8 +35,23 @@
 #ifndef L3G4200D_H_
 #define L3G4200D_H_
 
-#include "timer.h"
 #include "myMath.h"
+#include <stdlib.h>
+#include <stdio.h>
+#include <avr/io.h>
+#include <util/delay.h>
+#include "SPI.h"
+
+/* PACKAGE
+ *
+ * +---------+
+ * |         |         △ +x
+ * |         |         ⎟
+ * |         |   +y    ⎟
+ * | o       |   ◁⎯⎯⎯⎯⎯◎     z geht aus der Ebene raus. Die Drehrichtungen der
+ * +---------+               Achsen gehorchen der Rechten-Hand-Regel, wenn der
+ *                           Daumen Richtung Pfeilspitze zeigt.
+ */
 
 /*
  * Includefile for Gyrometer L3G4200
@@ -88,12 +103,6 @@
 #define GYRO_FIFO_MODE_Bypass	0
 #define GYRO_FIFO_MODE_Fifo		_BV(5)
 #define GYRO_FIFO_MODE_Stream	_BV(6)
-
-#include <stdlib.h>
-#include <stdio.h>
-#include <avr/io.h>
-#include <util/delay.h>
-#include "SPI.h"
 
 template <uint8_t CS, uint8_t SCKL, uint8_t DOUT, uint8_t DIN>
 class L3G4200D {
@@ -182,6 +191,7 @@ class L3G4200D {
 			}
 			uint8_t entries = read(GYRO_FIFO_SRC_REG) & 0x1f; // Nur die letzten 5 Bits lesen
 			xyz[0] = xyz[1] = xyz[2] = 0;
+			int16_t xyzTmp[3];
 
 			for (uint8_t i = 0; i < entries; i++) {
 				readData(xyzTmp);

@@ -65,7 +65,6 @@
  * nicht korrekt geschrieben oder gelesen werden können. Entweder ist unser
  * Chip kaputt oder es liegt an anderen unerklärlichen Gründen.
  */
-
 #define USE_OFFSET 0
 
 //*******************************************************

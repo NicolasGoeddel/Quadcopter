@@ -52,7 +52,6 @@ extern "C" void __cxa_pure_virtual() {
 #include "Bluetooth.h"
 #include "ADXL345.h"
 #include "L3G4200D.h"
-#include "timer.h"
 #include "PID.h"
 #include "CFilter.h"
 #include "myMath.h"
