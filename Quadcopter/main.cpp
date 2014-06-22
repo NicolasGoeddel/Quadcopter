@@ -59,6 +59,7 @@ extern "C" void __cxa_pure_virtual() {
 #include "DMAController.h"
 #include "Transmitter.h"
 #include "Clock.h"
+#include "myMath.h"
 
 //#define DEBUG_DMA
 //#define DEBUG_RF
@@ -103,8 +104,6 @@ struct Motor_t {
 			set4ChanPWM(timer, m[0], m[1], m[2], m[3]);
 		}
 };
-
-#define DEG(a) (a * 57.295779579)
 
 Motor_t motor(0);
 

@@ -166,7 +166,12 @@ class ADXL345 {
 		 */
 		PORT_t * port;
 
-		float accelScaleFactor;
+		/**
+		 * Der Skalierungsfaktor um die originalen Ganzzahlwerte aus dem Chip
+		 * in m/s² umzurechnen. Er ändert sich je nachdem wie @range eingestellt
+		 * wurde.
+		 */
+		float scaleFactor;
 
 		/**
 		 * Dieses Array enthält die Beschleunigung in alle drei Richtungen in m/s²,
@@ -175,28 +180,18 @@ class ADXL345 {
 		float meterPerSecSec[3];
 
 		/**
-		 * Eine temporäre Variable, die zum Kalibrieren und für Smooth benutzt wird.
-		 */
-		int32_t accelSampleSum[3];
-
-		/**
-		 * Gibt an, wie viele Samples in accelSampleSum schon acquiriert wurden.
-		 */
-		uint8_t accelSampleCount;
-
-		/**
-		 * Diese Array enthält alle letzten n Werte für das Smoothing-Verfahren und
-		 * arbeitet wie ein Ringpuffer.
+		 * Hier werden die gemittelten Werte der drei Beschleunigungsachsen
+		 * berechnet und gespeichert. Sie werden genutzt bei measureSmooth().
 		 */
 		MeanValue<int16_t, int32_t> smoothValues[3];
 
 		/**
-		 * Der eingestellte Messbereich. Mögliche Werte sind 2, 4, 8 und 16
+		 * Der eingestellte Messbereich. Mögliche Werte sind 2, 4, 8 und 16.
 		 */
 		uint8_t range;
 
 		/**
-		 * Offset-Werte für die Offsetregister im ADX345
+		 * Offset-Werte für die Offsetregister im ADX345.
 		 */
 		int32_t offset[3];
 		int8_t offset8[3];
@@ -242,15 +237,6 @@ class ADXL345 {
 		};
 		uint16_t sampleRate;
 
-		struct rawValue {
-				union {
-						int16_t x;
-						int16_t y;
-						int16_t z;
-						uint16_t raw;
-				};
-		};
-
 		/**
 		 * Gibt den Inhalt eines bestimmten Registers vom ADXL345 zurück.
 		 * @param register_address Das auszulesende Register.
@@ -284,14 +270,14 @@ class ADXL345 {
 			port->OUTSET = _BV(CS);
 		}
 
-		void writeOffset(int8_t x, int8_t y, int8_t z) {
+		void writeOffset(int8_t* xyz) {
 			uint8_t write_address = ACC_MB_BIT | ACC_OFSX;
 			port->OUTCLR = _BV(CS);
 
 			spi.write(write_address);
-			spi.write(x);
-			spi.write(y);
-			spi.write(z);
+			spi.write(xyz[0]);
+			spi.write(xyz[1]);
+			spi.write(xyz[2]);
 
 			port->OUTSET = _BV(CS);
 		}
@@ -304,21 +290,26 @@ class ADXL345 {
 		 */
 		void readData(int16_t* xyz) {
 			uint8_t read_address;
-			rawValue in;
+			struct {
+					union {
+							int16_t i;
+							uint16_t u;
+					};
+			} in;
 			read_address = ACC_RW_BIT | ACC_MB_BIT | ACC_DATAX0;
 
 			port->OUTCLR = _BV(CS);
 
 			spi.write(read_address);
-			in.raw = spi.read();
-			in.raw |= spi.read() << 8;
-			xyz[0] = in.x;
-			in.raw = spi.read();
-			in.raw |= spi.read() << 8;
-			xyz[1] = in.y;
-			in.raw = spi.read();
-			in.raw |= spi.read() << 8;
-			xyz[2] = in.z;
+			in.u = spi.read();
+			in.u |= spi.read() << 8;
+			xyz[0] = in.i;
+			in.u = spi.read();
+			in.u |= spi.read() << 8;
+			xyz[1] = in.i;
+			in.u = spi.read();
+			in.u |= spi.read() << 8;
+			xyz[2] = in.i;
 
 			port->OUTSET = _BV(CS);
 		}
@@ -376,15 +367,13 @@ class ADXL345 {
 			PORTCFG.MPCMASK = _BV(CS);
 			port->PIN0CTRL = PORT_OPC_TOTEM_gc;
 
-			accelSampleCount = 0;
 			for (uint8_t i = 0; i < 3; i++) {
 				meterPerSecSec[i] = 0.0;
-				accelSampleSum[i] = 0;
 			}
 
 			sampleRate = SampleRate_100;
 			range = 2;
-			accelScaleFactor = ENV_G * (float)range / 32768.0;
+			scaleFactor = ENV_G * (float)range / 32768.0;
 
 			enableFIFO(false);
 
@@ -433,7 +422,7 @@ class ADXL345 {
 				range = 2;
 				mode = ACC_RANGE_2G;
 			}
-			accelScaleFactor = ENV_G * (float)range / 32768.0;
+			scaleFactor = ENV_G * (float)range / 32768.0;
 			write(ACC_DATA_FORMAT, /* _BV(ACC_SELF_TEST) | ACC_USE_3WIRE_SPI | */ ACC_FULL_RES | ACC_JUSTIFY | mode);
 		}
 
@@ -560,9 +549,9 @@ class ADXL345 {
 
 			for (uint8_t axis = 0; axis < 3; axis++) {
 #if USE_OFFSET
-				meterPerSecSec[axis] = smoothValues[axis](values[axis]) * accelScaleFactor;
+				meterPerSecSec[axis] = smoothValues[axis](values[axis]) * scaleFactor;
 #else
-				meterPerSecSec[axis] = smoothValues[axis](values[axis] - offset[axis]) * accelScaleFactor;
+				meterPerSecSec[axis] = smoothValues[axis](values[axis] - offset[axis]) * scaleFactor;
 #endif
 			}
 		}
@@ -579,9 +568,9 @@ class ADXL345 {
 
 			for (uint8_t axis = 0; axis < 3; axis++) {
 #if USE_OFFSET
-				meterPerSecSec[axis] = values[axis] * accelScaleFactor;
+				meterPerSecSec[axis] = values[axis] * scaleFactor;
 #else
-				meterPerSecSec[axis] = (values[axis] - offset[axis]) * accelScaleFactor;
+				meterPerSecSec[axis] = (values[axis] - offset[axis]) * scaleFactor;
 #endif
 			}
 		}
@@ -595,7 +584,7 @@ class ADXL345 {
 		 * @return	Gibt true zurück, wenn der berechnete Offset in
 		 *          8-Bit-Offset-Register passt, sonst false.
 		 */
-		bool calibrate() {
+		bool calibrate(uint8_t samples = 100) {
 			bool error = false;
 #if USE_OFFSET
 			// Setze Offsetregister auf 0
@@ -605,17 +594,13 @@ class ADXL345 {
 			int16_t values[3];
 
 			// Berechne den Mittelwert über 100 Samples
-			accelSampleSum[0] = 0;
-			accelSampleSum[1] = 0;
-			accelSampleSum[2] = 0;
-			accelSampleCount = 0;
-			for (uint8_t samples = 0; samples < 100; samples++) {
+			int32_t accelSampleSum[3] = {0, 0, 0};
+			for (uint8_t sample = 0; sample < samples; sample++) {
 
 				readXYZ(values);
 				for (uint8_t axis = 0; axis < 3; axis++) {
 					accelSampleSum[axis] += values[axis];
 				}
-				accelSampleCount++;
 				_delay_ms(10);
 			}
 
@@ -624,11 +609,10 @@ class ADXL345 {
 				 * die Offsetregister nur mit 8 Bit arbeiten und nur von -2g bis 2g
 				 * laufen.
 				 */
-				offset[i] = accelSampleSum[i] / accelSampleCount;
+				offset[i] = accelSampleSum[i] / samples;
 				if (i == 2) {
 					offset[2] -= (32768 / range);
 				}
-				//accZero[i] = offset[i];
 				/* Deswegen müssen wir die berechneten Offsets jetzt auf 8 Bit runter
 				 * brechen und noch die eingestellte Range beachten.
 				 */
@@ -647,7 +631,7 @@ class ADXL345 {
 
 #if USE_OFFSET
 			// Schreibe die neuen Offsets in das entsprechende Register.
-			writeOffset(offset8[0], offset8[1], offset8[2]);
+			writeOffset(offset8);
 #endif
 
 			return !error;

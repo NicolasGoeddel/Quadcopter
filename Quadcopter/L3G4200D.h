@@ -42,8 +42,6 @@
  * Includefile for Gyrometer L3G4200
  */
 
-#define radians(deg) ((deg) * 0.159154946)
-
 //Register Map							Type	Default
 #define GYRO_WHO_AM_I		0x0F 	//	r		11010011
 #define GYRO_CTRL_REG1		0x20	//	rw		00000111
@@ -75,13 +73,21 @@
 #define GYRO_RW_BIT			0x80
 #define GYRO_MS_BIT			0x40
 
-//CTRL_REG1
+// CTRL_REG1
 #define GYRO_PD_NormalMode	_BV(3)
 #define GYRO_PD_PowerDown	0
 #define GYRO_X_Axis_Enable	_BV(0)
 #define GYRO_Y_Axis_Enable	_BV(1)
 #define GYRO_Z_Axis_Enable	_BV(2)
 
+// CTRL_REG5
+#define GYRO_CTRL5_FIFO_EN	_BV(6)
+#define GYRO_CTRL5_HP_EN	_BV(5)
+
+// FIFO_CTRL_REG
+#define GYRO_FIFO_MODE_Bypass	0
+#define GYRO_FIFO_MODE_Fifo		_BV(5)
+#define GYRO_FIFO_MODE_Stream	_BV(6)
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -92,20 +98,27 @@
 template <uint8_t CS, uint8_t SCKL, uint8_t DOUT, uint8_t DIN>
 class L3G4200D {
 	private:
+		/**
+		 * Deklariere die SPI-Klasse, die benutzt werden soll. In diesem
+		 * Fall ist es eine Software-SPI.
+		 */
 		SPI<SCKL, DIN, DOUT, 0> spi;
+
+		/**
+		 * Port, an dem der ADXL345 angeschlossen ist.
+		 */
 		PORT_t * port;
 
 		float gyroRate[3];
-		int16_t gyroSample[3];
 		float gyroScaleFactor;
-		float gyroHeading;
-		uint16_t gyroLastMeasuredTime;
-		uint16_t gyroSampleCount;
 
-		int16_t* smoothSamples[3];
-		uint8_t smoothCount;
-		uint8_t smoothIndex;
-		int32_t smoothSum[3];
+		bool useFIFO;
+
+		/**
+		 * Diese Array enthält alle letzten n Werte für das Smoothing-Verfahren und
+		 * arbeitet wie ein Ringpuffer.
+		 */
+		MeanValue<int16_t, int32_t> smoothValues[3];
 
 		uint8_t read(char register_address) {
 			uint8_t read_address = GYRO_RW_BIT | register_address;
@@ -130,20 +143,52 @@ class L3G4200D {
 			port->OUTSET = _BV(CS);
 		}
 
-		void readXYZ(int16_t &x, int16_t &y, int16_t &z) {
-			uint8_t read_address = GYRO_RW_BIT | GYRO_MS_BIT | GYRO_OUT_X_L;
+		/**
+		 * Liest die Rohdaten der drei Achsen aus den normalen
+		 * Registern aus.
+		 *
+		 * @param xyz Enthält nach dem Aufruf die Rotationsänderung aller Achsen.
+		 */
+		void readData(int16_t* xyz) {
+			uint8_t read_address;
+			struct {
+					union {
+							int16_t i;
+							uint16_t u;
+					};
+			} in;
+			read_address = ACC_RW_BIT | ACC_MB_BIT | ACC_DATAX0;
 
 			port->OUTCLR = _BV(CS);
 
 			spi.write(read_address);
-			x = spi.read();
-			x |= spi.read() << 8;
-			y = spi.read();
-			y |= spi.read() << 8;
-			z = spi.read();
-			z |= spi.read() << 8;
+			in.u = spi.read();
+			in.u |= spi.read() << 8;
+			xyz[0] = in.i;
+			in.u = spi.read();
+			in.u |= spi.read() << 8;
+			xyz[1] = in.i;
+			in.u = spi.read();
+			in.u |= spi.read() << 8;
+			xyz[2] = in.i;
 
 			port->OUTSET = _BV(CS);
+		}
+
+		void readXYZ(int16_t* xyz) {
+			if (!useFIFO) {
+				readData(xyz);
+				return;
+			}
+			uint8_t entries = read(GYRO_FIFO_SRC_REG) & 0x1f; // Nur die letzten 5 Bits lesen
+			xyz[0] = xyz[1] = xyz[2] = 0;
+
+			for (uint8_t i = 0; i < entries; i++) {
+				readData(xyzTmp);
+				xyz[0] += xyzTmp[0];
+				xyz[1] += xyzTmp[1];
+				xyz[2] += xyzTmp[2];
+			}
 		}
 
 	public:
@@ -166,25 +211,21 @@ class L3G4200D {
 		};
 
 		int16_t gyroZero[3];
+
 		L3G4200D(PORT_t & PORT) : spi(PORT) {
 			port = &PORT;
 			port->DIRSET = _BV(CS);
 			port->OUTSET = _BV(CS);
+
 			for (uint8_t i = 0; i < 3; i++) {
 				gyroRate[i] = 0.0;
 				gyroZero[i] = 0;
-				gyroSample[i] = 0;
-				smoothSamples[i] = (int16_t*) 0;
-				smoothSum[i] = 0;
 			}
-			gyroLastMeasuredTime = 0;
-			gyroSampleCount = 0;
-			gyroHeading = 0.0;
+
 			// Umrechnung für Fullscale select 2000 dps
 			gyroScaleFactor = 2000.0 * M_PI / (32768.0 * 180.0);
 
-			smoothCount = 0;
-			smoothIndex = 0;
+			enableFIFO(false);
 
 			_delay_ms(1);
 		}
@@ -192,22 +233,17 @@ class L3G4200D {
 		~L3G4200D() {
 		}
 
+		/**
+		 * Stellt ein über wie viele Werte der Mittelwert gebildet werden soll, wenn
+		 * die Funktion measureSmooth() aufgerufen wird. Der Mittelwert wird gebildet,
+		 * indem measureSmooth() einfach mehrfach aufgerufen wird.
+		 *
+		 * @param smoothCount Die Anzahl der Werte, über die der Mittelwert gebildet
+		 *        werden soll.
+		 */
 		void setSmooth(uint8_t smoothCount) {
-			this->smoothCount = smoothCount;
-			smoothIndex = 0;
 			for (uint8_t axis = 0; axis < 3; axis++) {
-				if (smoothSamples[axis]) {
-					free(smoothSamples[axis]);
-				} else {
-					smoothSamples[axis] = (int16_t*) malloc(smoothCount * sizeof(int16_t));
-					for (uint8_t sample = 0; sample < smoothCount; sample++) {
-						smoothSamples[axis][sample] = gyroZero[axis];
-					}
-				}
-				smoothSum[axis] = gyroZero[axis] * smoothCount;
-			}
-			for (uint8_t sample = 0; sample < smoothCount; sample++) {
-				measureSmooth();
+				smoothValues[axis].setCapacity(smoothCount);
 			}
 		}
 
@@ -229,67 +265,75 @@ class L3G4200D {
 			write(GYRO_CTRL_REG1, bandwith | cutOff | GYRO_PD_NormalMode | GYRO_X_Axis_Enable | GYRO_Y_Axis_Enable | GYRO_Z_Axis_Enable);
 		}
 
+		/**
+		 * Aktiviert oder deaktiviert den im L3G4200D enthaltenen FIFO-Puffer
+		 * und setzt ihn in den Stream-Modus, sodass immer die aktuellsten
+		 * Daten vorhanden sind, auch wenn der Puffer überläuft.
+		 *
+		 * @param state
+		 */
+		void enableFIFO(bool state = true) {
+			useFIFO = state;
+			if (state) {
+				write(GYRO_CTRL_REG5, GYRO_CTRL5_FIFO_EN);
+				write(GYRO_FIFO_CTRL_REG, GYRO_FIFO_MODE_Stream);
+			} else {
+				write(GYRO_CTRL_REG5, 0);
+				write(GYRO_FIFO_CTRL_REG, GYRO_FIFO_MODE_Bypass);
+			}
+		}
+
 		void setDefaults() {
 			setBandwidth(Bandwidth_100, CutOff_12_5);
+
 			write(GYRO_CTRL_REG2, 0b00000000);
 			write(GYRO_CTRL_REG3, 0b00000000);
 			write(GYRO_CTRL_REG4, 0b10110000);	//Full Scale Selection:2000dps
-			write(GYRO_CTRL_REG5, 0b00000000);
+
+			enableFIFO(true);
 		}
 
+		/**
+		 * Berechnet den Mittelwert über die letzten n Werte. Über wie
+		 * viele Werte der Mittelwert gebildet werden soll, lässt sich
+		 * mit setSmooth() einstellen. Die gemittelten Werte können mit
+		 * den entsprechenden Gettern ausgelesen werden.
+		 */
 		void measureSmooth() {
-			if (smoothCount == 0) {
-				measure();
-				return;
-			}
-			int16_t x, y, z;
+			int16_t values[3];
+
+			readXYZ(values);
 
 			for (uint8_t axis = 0; axis < 3; axis++) {
-				smoothSum[axis] -= smoothSamples[axis][smoothIndex];
+				gyroRate[axis] = smoothValues[axis](values[axis] - gyroZero[axis]) * gyroScaleFactor;
 			}
-
-			readXYZ(x, y, z);
-			smoothSamples[0][smoothIndex] = x - gyroZero[0];
-			smoothSamples[1][smoothIndex] = y - gyroZero[1];
-			smoothSamples[2][smoothIndex] = z - gyroZero[2];
-			for (uint8_t axis = 0; axis < 3; axis++) {
-				smoothSum[axis] += smoothSamples[axis][smoothIndex];
-				gyroRate[axis] = smoothSum[axis] * gyroScaleFactor / smoothCount;
-			}
-			smoothIndex = (smoothIndex + 1) % smoothCount;
 		}
 
 		void measure() {
-			int16_t x, y, z;
+			int16_t values[3];
 
-			readXYZ(x, y, z);
-			gyroRate[0] = (x - gyroZero[0]) * gyroScaleFactor;
-			gyroRate[1] = (y - gyroZero[1]) * gyroScaleFactor;
-			gyroRate[2] = (z - gyroZero[2]) * gyroScaleFactor;
+			readXYZ(values);
 
-			uint32_t currentTime = milliSeconds;
-			if (gyroRate[2] > radians(1.0) || gyroRate[2] < radians(-1.0)) {
-				gyroHeading += gyroRate[2] * ((currentTime - gyroLastMeasuredTime) / 1000.0);
+			for (uint8_t axis = 0; axis < 3; axis++) {
+				gyroRate[axis] = (values[axis] - gyroZero[axis]) * gyroScaleFactor;
 			}
-
-			gyroLastMeasuredTime = currentTime;
 		}
 
-		void calibrate() {
+		void calibrate(uint8_t samples = 100) {
 			int32_t zero[3] = {0, 0, 0};
 
-			for (uint8_t i = 0; i < 100; i++) {
-				int16_t x, y, z;
-				readXYZ(x, y, z);
-				zero[0] += x;
-				zero[1] += y;
-				zero[2] += z;
+			for (uint8_t i = 0; i < samples; i++) {
+				int16_t values[3];
+				readXYZ(values);
+				for (uint8_t axis = 0; axis < 3; axis++) {
+					zero[axis] += values[axis];
+				}
 				_delay_ms(10);
 			}
 
-			gyroZero[0] = zero[0] / 100;
-			gyroZero[1] = zero[1] / 100;
-			gyroZero[2] = zero[2] / 100;
+			gyroZero[0] = zero[0] / samples;
+			gyroZero[1] = zero[1] / samples;
+			gyroZero[2] = zero[2] / samples;
 		}
 };
 

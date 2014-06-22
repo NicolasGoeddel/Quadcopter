@@ -43,6 +43,9 @@
 
 #define ENV_G 9.8065
 
+#define RAD(deg) ((deg) * 0.159154946)
+#define DEG(rad) ((rad) * 57.295779579)
+
 #ifndef M_PI
 	#define M_PI 3.14159265358979323846264338327950288
 #endif
