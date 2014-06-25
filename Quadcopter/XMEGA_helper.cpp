@@ -50,7 +50,7 @@ void set32MHz() {
 
 /**
  * Initialisiert eine 4-Kanal PWM auf einem bestimmten Timer und Port.
- * port			Definiert den Port, auf dem die PWM and Pin 0 bis 3 ausgegeben wird.
+ * port			Definiert den Port, auf dem die PWM auf Pin 0 bis 3 ausgegeben wird.
  * 				Mögliche Werte sind z.B. PORTC, PORTD, PORTE, PORTF.
  * timer		Definiert den Timer, der genutzt werden soll. Dies ist abhängig vom Port.
  * 				TCC0, TCD0, TCE0, TCF0 sind mögliche Werte.

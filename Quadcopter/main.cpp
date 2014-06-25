@@ -59,6 +59,7 @@ extern "C" void __cxa_pure_virtual() {
 #include "Transmitter.h"
 #include "Clock.h"
 #include "myMath.h"
+#include "Motor.h"
 
 //#define DEBUG_DMA
 //#define DEBUG_RF
@@ -84,27 +85,6 @@ extern "C" void __cxa_pure_virtual() {
  */
 
 const float dT = 1.0 / TIMER_FREQUENCY;
-
-struct Motor_t {
-		int16_t m[4];
-		Motor_t(int16_t speed) {
-			m[0] = m[1] = m[2] = m[3] = speed;
-		}
-		void set(int16_t speed) {
-			m[0] = m[1] = m[2] = m[3] = speed;
-		}
-		void cutBorders(int16_t low, int16_t high) {
-			for (uint8_t i = 0; i < 4; i++) {
-				if (m[i] < low) m[i] = low;
-				if (m[i] > high) m[i] = high;
-			}
-		}
-		void setPWM(TC0_t &timer) {
-			set4ChanPWM(timer, m[0], m[1], m[2], m[3]);
-		}
-};
-
-Motor_t motor(0);
 
 #ifdef DEBUG_TEST
 int main() {
@@ -138,8 +118,8 @@ int main() {
 	_delay_ms(100);
 
 	// init4ChanPWM gibt als Rückgabewert den maximalen DutyCycle zurück
-	uint16_t max = init4ChanPWM(PORTD, TCD0, 100);
-	display.setCursorPos(0, 0)->write("PWM max=")->writeUint(max);
+	Motor motor(PORTD, TCD0, 0.1, 0.20);
+	display.setCursorPos(0, 0)->write("PWM max=")->writeUint(motor.getMaxDC());
 
 	//Aktiviere die Interrupts
 	activateInterrupts();
@@ -208,11 +188,10 @@ int main() {
 	// END INITIALISATION
 
 	// Duty Cycles für verschiedene Geschwindigkeiten
-	uint16_t zero     = ((uint32_t) max * 10 / 100);		// 10%
-	uint16_t standby  = ((uint32_t) max * 125 / 1000);		// 12.5%
-	uint16_t power    = ((uint32_t) max * 130 / 1000);		// 13%
-	uint16_t maxPower = ((uint32_t) max * 165 / 1000);		// 17.5%
-	uint16_t speed    = zero;
+	float standby = 0.20;	// regelbar mit Cursor hoch und runter
+	float power = 0.35;
+
+	float speed = 0.0;
 
 	/*float x, y, z;
 	x = y = z = 0; */
@@ -222,13 +201,13 @@ int main() {
 	#define MAX_ANGLE_RAD (MAX_ANGLE_DEG * 0.017453293)
 
 	// Einstellung für die PID-Regler
-	#define PID_P 0.2
+	#define PID_P 0.15
 	#define PID_I 0.5
 	#define PID_D 0.0576
 	#define PID_I_Min -5.0
 	#define PID_I_Max 5.0
 	#define PID_I_Band 10.0
-	#define PID_Scale 0.12
+	#define PID_Scale 0.06
 	PID pidX(PID_P * PID_Scale, PID_I * PID_Scale, PID_D * PID_Scale, dT);
 	pidX.setIBand(PID_I_Band, PID_I_Min, PID_I_Max);
 	PID pidY(PID_P * PID_Scale, PID_I * PID_Scale, PID_D * PID_Scale, dT);
@@ -243,7 +222,7 @@ int main() {
 	float speedZ = 0.0;
 	float posZ = 0.0;
 
-	motor.set(zero);
+	motor.setSpeed(0);
 	_delay_ms(400);
 
 	Clock clock;
@@ -297,8 +276,8 @@ int main() {
 			pidAngleX = pidX(rX, angleX);
 			pidAngleY = pidY(rY, angleY);
 
-			int16_t pwmX = pidAngleX * (maxPower - zero);// * PID_Scale;
-			int16_t pwmY = pidAngleY * (maxPower - zero);// * PID_Scale;
+			float pwmX = pidAngleX * 1.0; // * PID_Scale;
+			float pwmY = pidAngleY * 1.0; // * PID_Scale;
 
 			// Debug-Infos ausgeben
 #			ifdef DISPLAY
@@ -331,19 +310,19 @@ int main() {
 				speed = standby;
 #			ifndef REMOTE
 			} else {
-				speed = zero;
+				speed = 0;
 #			endif
 			}
 
 #			ifdef REMOTE
-			if (remote.getButton(Transmitter::btnFire) || (DEBUG_Button())) {
+			if (remote.getButton(Transmitter::btnFire)) {
 				speed = standby;
 			} else {
-				speed = zero;
+				speed = 0;
 			}
 			if (remote.getButton(Transmitter::btnMiddle)) {
 				if (remote.getButton(Transmitter::btnFire)) {
-					speed = maxPower;
+					speed = 1.0;
 				} else {
 					speed = power;
 				}
@@ -361,20 +340,26 @@ int main() {
 				posZ = 0.0;
 				_delay_ms(200);
 			}
+
+			if (remote.getButton(Transmitter::curUp)) {
+				standby += 0.001;
+			}
+			if (remote.getButton(Transmitter::curDown)) {
+				standby -= 0.001;
+			}
+			float yaw = 0.0;
+			if (remote.getButton(Transmitter::curLeft)) {
+				yaw = 0.01;
+			}
+			if (remote.getButton(Transmitter::curRight)) {
+				yaw = -0.01;
+			}
 #			endif
 
-			if (speed != zero) {
-				// Motormischer
-				motor.m[0] = speed - pwmY;
-				motor.m[2] = speed + pwmY;
-				motor.m[1] = speed + pwmX;
-				motor.m[3] = speed - pwmX;
-				motor.cutBorders(0, maxPower);
-			} else {
-				motor.set(zero);
-			}
-
-			motor.setPWM(TCD0);
+			motor.setSpeed(speed - pwmY + yaw,
+					       speed + pwmY - yaw,
+					       speed + pwmX + yaw,
+					       speed - pwmX - yaw);
 
 			clock.eventInterrupt = false;
 
@@ -383,17 +368,9 @@ int main() {
 		}
 
 #		ifdef DISPLAY
-		int16_t perc;
-//		perc = ((int32_t)m1 * 100) / max;
-//		display.write(2, 0, "m1: ")->writeInt(perc)->write("%  ");
-//		perc = ((int32_t)m3 * 100) / max;
-//		display.write(2, 8, "m3: ")->writeInt(perc)->write("%  ");
-		//perc = ((int32_t)(motor.m[1] - zero) * 100) / (maxPower - zero);
-		perc = ((int32_t)motor.m[1] * 100) / max;
-		display.setCursorPos(3, 0)->write("m1:")->writeInt4(perc)->write("%");
-		//perc = ((int32_t)(motor.m[3] - zero) * 100) / (maxPower - zero);
-		perc = ((int32_t)motor.m[3] * 100) / max;
-		display.setCursorPos(3, 0)->write("m3:")->writeInt4(perc)->write("%");
+		display.setCursorPos(3, 0)->write("standby: ")->writeFloat(standby);
+		//display.setCursorPos(3, 0)->write("m1:")->writeInt4(motor.getSpeedI(1))->write("%");
+		//display.setCursorPos(3, 0)->write("m3:")->writeInt4(motor.getSpeedI(3))->write("%");
 #		endif
 	}
 }

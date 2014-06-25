@@ -24,5 +24,3 @@ Clock::Clock() {
 	eventInterrupt = 0;
 	configureInterrupt(TCD1, TIMER_FREQUENCY);
 }
-
-
