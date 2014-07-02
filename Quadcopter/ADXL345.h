@@ -241,7 +241,7 @@ class ADXL345 {
 		 * @param register_address Das auszulesende Register.
 		 * @return Der Inhalt des Registers.
 		 */
-		uint8_t read(char register_address) {
+		uint8_t read(uint8_t register_address) {
 			uint8_t read_address = ACC_RW_BIT | register_address;
 			uint8_t register_value = 0;
 

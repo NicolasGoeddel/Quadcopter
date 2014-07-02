@@ -81,6 +81,15 @@ class PID {
 			dGain = d;
 		}
 
+		void getPID(float* p, float* i, float* d) {
+			if (p)
+				*p = pGain;
+			if (i)
+				*i = iGain;
+			if (d)
+				*d = dGain;
+		}
+
 		float operator()(float error) {
 			// calculate the integral state with approriate limiting
 			float iState = 0.0;

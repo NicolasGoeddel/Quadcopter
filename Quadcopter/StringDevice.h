@@ -11,9 +11,16 @@
 #include <avr/io.h>
 #include <stdlib.h>		// wg. itoa
 #include "libstdcpp.h"	// für new und delete
+#include <string.h>
 
 template <class ReturnType>
 class StringDevice {
+	private:
+		void static zeroString(char * buf, uint8_t length) {
+			for (uint8_t i = 0; i < length; i++) {
+				buf[i] = 0;
+			}
+		}
 	public:
 		virtual ~StringDevice() {};
 
@@ -33,6 +40,7 @@ class StringDevice {
 
 		ReturnType* writeInt(const int16_t i) {
 			char buf[8];
+			zeroString(buf, 8);
 			ltoa(i, buf, 10);
 			write(buf);
 			return (ReturnType*) this;
@@ -44,12 +52,13 @@ class StringDevice {
 			if (j < 100) writeChar(' ');
 			if (j < 10) writeChar(' ');
 			char buf[8];
+			zeroString(buf, 8);
 			ltoa(i, buf, 10);
 			write(buf);
 			return (ReturnType*) this;
 		}
 
-		ReturnType* writeInt4x3(const int16_t x, const int16_t y, const int16_t z) {
+		ReturnType* writeInt4(const int16_t x, const int16_t y, const int16_t z) {
 			writeInt4(x);
 			writeChar(',');
 			writeInt4(y);
@@ -60,9 +69,31 @@ class StringDevice {
 
 		ReturnType* writeUint(const uint16_t i) {
 			char buf[7];
+			zeroString(buf, 7);
 			ultoa(i, buf, 10);
 			write(buf);
 			return (ReturnType*) this;
+		}
+
+		ReturnType* writeUint32(const uint32_t i) {
+			char buf[11];
+			zeroString(buf, 11);
+			ultoa(i, buf, 10);
+			write(buf);
+			return (ReturnType*) this;
+		}
+
+		void writeUint32Raw(const uint32_t i) {
+			union {
+			    unsigned char c[4];
+			    uint32_t i;
+			} pun;
+
+			pun.i = i;
+			writeChar(pun.c[0]);
+			writeChar(pun.c[1]);
+			writeChar(pun.c[2]);
+			writeChar(pun.c[3]);
 		}
 
 		/**
@@ -71,10 +102,11 @@ class StringDevice {
 		 *
 		 * @param f Der zu schreibende Floatwert.
 		 */
-		ReturnType* writeFloat(float f) {
-			char fstr[8];
+		ReturnType* writeFloat(const float f) {
+			char fstr[12];
+			zeroString(fstr, 12);
 
-			dtostrf(f, 8, 4, fstr);
+			dtostrf(f, 8, 6, fstr);
 			write(fstr);
 			return (ReturnType*) this;
 		}
@@ -86,7 +118,7 @@ class StringDevice {
 		 *
 		 * @param f Der zu schreibende Floatwert.
 		 */
-		void writeFloatRaw(float f) {
+		void writeFloatRaw(const float f) {
 			union {
 			    unsigned char c[4];
 			    float f;
@@ -103,6 +135,7 @@ class StringDevice {
 			if (i < 100) writeChar(' ');
 			if (i < 10) writeChar(' ');
 			char buf[7];
+			zeroString(buf, 7);
 			ultoa(i, buf, 10);
 			write(buf);
 			return (ReturnType*) this;

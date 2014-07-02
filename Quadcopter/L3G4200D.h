@@ -121,6 +121,8 @@ class L3G4200D {
 		float gyroRate[3];
 		float gyroScaleFactor;
 
+		int16_t gyroZero[3];
+
 		bool useFIFO;
 
 		/**
@@ -129,7 +131,7 @@ class L3G4200D {
 		 */
 		MeanValue<int16_t, int32_t> smoothValues[3];
 
-		uint8_t read(char register_address) {
+		uint8_t read(uint8_t register_address) {
 			uint8_t read_address = GYRO_RW_BIT | register_address;
 			uint8_t register_value = 0;
 
@@ -166,7 +168,7 @@ class L3G4200D {
 							uint16_t u;
 					};
 			} in;
-			read_address = ACC_RW_BIT | ACC_MB_BIT | ACC_DATAX0;
+			read_address = GYRO_RW_BIT | GYRO_MS_BIT | GYRO_OUT_X_L;
 
 			port->OUTCLR = _BV(CS);
 
@@ -189,6 +191,7 @@ class L3G4200D {
 				readData(xyz);
 				return;
 			}
+
 			uint8_t entries = read(GYRO_FIFO_SRC_REG) & 0x1f; // Nur die letzten 5 Bits lesen
 			xyz[0] = xyz[1] = xyz[2] = 0;
 			int16_t xyzTmp[3];
@@ -202,26 +205,6 @@ class L3G4200D {
 		}
 
 	public:
-		enum Bandwidth {
-			Bandwidth_100 = (0b00 << 6),
-			Bandwidth_200 = (0b01 << 6),
-			Bandwidth_400 = (0b10 << 6),
-			Bandwidth_800 = (0b11 << 6)
-		};
-
-		enum CutOff {
-			CutOff_12_5 = (0b00 << 4),
-			CutOff_20   = (0b00 << 4),
-			CutOff_30   = (0b00 << 4),
-			CutOff_25   = (0b01 << 4),
-			CutOff_35   = (0b01 << 4),
-			CutOff_50   = (0b10 << 4),
-			CutOff_70   = (0b11 << 4),
-			CutOff_110  = (0b11 << 4)
-		};
-
-		int16_t gyroZero[3];
-
 		L3G4200D(PORT_t & PORT) : spi(PORT) {
 			port = &PORT;
 			port->DIRSET = _BV(CS);
@@ -271,8 +254,25 @@ class L3G4200D {
 			return (read(GYRO_WHO_AM_I) == 0b11010011);
 		}
 
-		void setBandwidth(Bandwidth bandwith, CutOff cutOff) {
-			write(GYRO_CTRL_REG1, bandwith | cutOff | GYRO_PD_NormalMode | GYRO_X_Axis_Enable | GYRO_Y_Axis_Enable | GYRO_Z_Axis_Enable);
+		enum Bandwidth {
+			Bandwidth_100 = (0b00 << 6),
+			Bandwidth_200 = (0b01 << 6),
+			Bandwidth_400 = (0b10 << 6),
+			Bandwidth_800 = (0b11 << 6)
+		};
+
+		enum CutOff {
+			CutOff_12_5 = (0b00 << 4),
+			CutOff_20   = (0b00 << 4),
+			CutOff_30   = (0b00 << 4),
+			CutOff_25   = (0b01 << 4),
+			CutOff_35   = (0b01 << 4),
+			CutOff_50   = (0b10 << 4),
+			CutOff_70   = (0b11 << 4),
+			CutOff_110  = (0b11 << 4)
+		};
+		void setBandwidth(Bandwidth bandwidth, CutOff cutOff) {
+			write(GYRO_CTRL_REG1, bandwidth | cutOff | GYRO_PD_NormalMode | GYRO_X_Axis_Enable | GYRO_Y_Axis_Enable | GYRO_Z_Axis_Enable);
 		}
 
 		/**
@@ -294,7 +294,7 @@ class L3G4200D {
 		}
 
 		void setDefaults() {
-			setBandwidth(Bandwidth_100, CutOff_12_5);
+			setBandwidth(Bandwidth_200, CutOff_50);
 
 			write(GYRO_CTRL_REG2, 0b00000000);
 			write(GYRO_CTRL_REG3, 0b00000000);

@@ -39,12 +39,21 @@ void DEBUG_LED(int8_t state);
 void DEBUG_LED_blink(uint8_t times);
 
 /**
- * Gibt den Zustand des Debugging Tasters zurück
+ * Gibt den Zustand des Debugging Tasters zurück.
  *
  * @return Zustand des Tasters:
  *         false - Taster nicht gedrückt.
  *         true - Taster gedrückt.
  */
 bool DEBUG_Button();
+
+/**
+ * Gibt den Zustand des Debugging Schalters zurück.
+ *
+ * @return Zustand des Schalters:
+ *         false - Schalters aus.
+ *         true - Schalters an.
+ */
+bool DEBUG_Switch();
 
 #endif /* DEBUG_H_ */
