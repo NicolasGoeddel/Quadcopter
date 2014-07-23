@@ -9,59 +9,76 @@
 #define USART_H_
 
 #include <avr/io.h>
+#include "StringDevice.h"
 
-class USART {
+class USART : StringDevice<USART> {
 	private:
+		USART_t* usart;
+		PORT_t* port;
+		uint32_t baudRate;
+		uint32_t cpuFreq;
 	public:
-		USART() {
-
+		USART(USART_t* usart, PORT_t* port) {
+			this->usart = usart;
+			this->port = port;
+			cpuFreq = F_CPU;
+			init(9600);
 		}
 
 		~USART() {
 
 		}
+
+		void setCPUFrequency(uint32_t cpuFreq) {
+			this->cpuFreq = cpuFreq;
+			setBaudrate(baudRate);
+		}
+
+		/**
+		 * Bisher ist nur die Baudrate variabel. 1 Stopbit, gerade Parität und 8 Bit Datengröße.
+		 *
+		 * @param baudrate
+		 */
+		bool init(uint32_t baudRate);
+
+		/**
+		 * \brief Set the baudrate value in the USART module
+		 *
+		 * This function sets the baudrate register with scaling regarding the CPU
+		 * frequency and makes sure the baud rate is supported by the hardware.
+		 * The function can be used if you don't want to calculate the settings
+		 * yourself or changes to baudrate at runtime is required.
+		 *
+		 * \param baudRate The baudrate.
+		 *
+		 * \retval true if the hardware supports the baud rate.
+		 * \retval false if the hardware does not support the baud rate (i.e. it's
+		 *               either too high or too low).
+		 */
+		bool setBaudrate(uint32_t baudRate);
+
+		using StringDevice<USART>::write;
+
+		USART* writeChar(const char c) {
+			while(!(usart->STATUS & USART_DREIF_bm));
+
+			USARTD1.DATA = c;
+			return this;
+		}
+
+		char receiveChar(){
+			while (!(usart->STATUS & USART_RXCIF_bm));
+
+			return ((uint8_t)usart->DATA);
+		}
+
+		char receiveCharAsync() {
+			return ((uint8_t)usart->DATA);
+		}
+
+		bool isDataAvailable() {
+			return (usart->STATUS & USART_RXCIF_bm) ? true : false;
+		}
 };
-
-#define USART_PORT USARTD1
-
-/**
- * \brief Set the baudrate value in the USART module
- *
- * This function sets the baudrate register with scaling regarding the CPU
- * frequency and makes sure the baud rate is supported by the hardware.
- * The function can be used if you don't want to calculate the settings
- * yourself or changes to baudrate at runtime is required.
- *
- * \param usart The USART module.
- * \param baud The baudrate.
- * \param cpu_hz The CPU frequency.
- *
- * \retval true if the hardware supports the baud rate
- * \retval false if the hardware does not support the baud rate (i.e. it's
- *               either too high or too low.)
- */
-bool USART_setBaudrate(USART_t *usart, uint32_t baud, uint32_t cpu_hz);
-void USART_setBaudrate(uint32_t baudrate);
-
-void USART_init(uint32_t baud);
-
-void USART_putchar(uint8_t c);
-
-void USART_putString(const char * c);
-
-/**
- * \brief Receive a data with the USART module
- *
- * This function returns the received data from the USART module.
- *
- * \param usart The USART module.
- *
- * \return The received data.
- */
-uint8_t USART_getchar();
-
-uint8_t USART_dataAvailable();
-
-uint8_t inline USART_getcharAsync();
 
 #endif /* USART_H_ */

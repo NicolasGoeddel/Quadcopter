@@ -25,6 +25,8 @@
  * man die Klasse mit der Baudrate 9600 initialisieren.
  */
 class Bluetooth : public StringDevice<Bluetooth> {
+	private:
+		USART* usart;
 	public:
 		/**
 		 * Erstelle ein Objekt der Bluetooth-Klasse mit einer bestimmten
@@ -32,7 +34,7 @@ class Bluetooth : public StringDevice<Bluetooth> {
 		 *
 		 * @param baud Die zu verwendende Baudrate.
 		 */
-		Bluetooth(uint32_t baud);
+		Bluetooth(USART_t* usart, PORT_t* port, uint32_t baud);
 
 		~Bluetooth() {
 		}
@@ -52,7 +54,8 @@ class Bluetooth : public StringDevice<Bluetooth> {
 		 * @return true, wenn Daten vorhanden sind, sonst false.
 		 */
 		bool isDataAvailable() {
-			return USART_dataAvailable();
+			return usart->isDataAvailable();
+			//return USART_dataAvailable();
 		}
 
 		using StringDevice<Bluetooth>::write;
@@ -65,7 +68,8 @@ class Bluetooth : public StringDevice<Bluetooth> {
 		 * @param c Das zu sendende Zeichen.
 		 */
 		Bluetooth* writeChar(const char c) {
-			USART_putchar(c);
+			usart->writeChar(c);
+			//USART_putchar(c);
 			return this;
 		}
 
@@ -77,7 +81,8 @@ class Bluetooth : public StringDevice<Bluetooth> {
 		 * @return Das empfangene Zeichen.
 		 */
 		char getChar(void)	{
-		    return USART_getchar();
+			return usart->receiveChar();
+		    //return USART_getchar();
 		}
 
 		/**
@@ -91,8 +96,10 @@ class Bluetooth : public StringDevice<Bluetooth> {
 		 *         war.
 		 */
 		char getCharAsync(void)	{
-			if (USART_dataAvailable())
-				return USART_getchar();
+			if (usart->isDataAvailable())
+				return usart->receiveChar();
+//			if (USART_dataAvailable())
+//				return USART_getchar();
 			return '\0';
 		}
 

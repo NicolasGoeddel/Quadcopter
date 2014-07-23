@@ -211,7 +211,7 @@ int main() {
 
 #	ifdef BLUETOOTH
 	// Initialisiere Bluetooth Debugger
-	Bluetooth bt(9600);
+	Bluetooth bt(&USARTD1, &PORTD, 9600);
 	if (!bt.isDeviceOk()) {
 		display.setCursorPos(errorLine++, 0)->write("BLUETOOTH ERROR!");
 	} else {

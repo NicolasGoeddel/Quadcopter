@@ -9,8 +9,10 @@
 
 #include "DEBUG.h"
 
-Bluetooth::Bluetooth(uint32_t baud) {
-	USART_init(baud);
+Bluetooth::Bluetooth(USART_t* usart, PORT_t* port, uint32_t baud) {
+	this->usart = new USART(usart, port);
+	this->usart->setBaudrate(baud);
+	//USART_init(baud);
 }
 
 void Bluetooth::getData(uint8_t* buffer, uint8_t length) {
@@ -111,7 +113,8 @@ bool Bluetooth::setBaud(uint32_t baud) {
 	}
 
 	// Setze jetzt auch die Baudrate vom USART neu
-	USART_setBaudrate(baud);
+	usart->setBaudrate(baud);
+	//USART_setBaudrate(baud);
 
 	return true;
 }
