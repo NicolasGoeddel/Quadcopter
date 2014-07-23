@@ -41,7 +41,7 @@
 /**
  * Auf 1 setzen, wenn die alte Implementierung benutzt werden soll.
  */
-#define USE_OLD_IMPLEMENTATION 0
+#define USE_OLD_IMPLEMENTATION false
 
 class PID {
 #if not USE_OLD_IMPLEMENTATION
@@ -84,18 +84,20 @@ class PID {
 		void getPID(float* p, float* i, float* d) {
 			if (p)
 				*p = pGain;
-			if (i)
+			if (i) {
 				*i = iGain;
+				iState = 0.0;
+			}
 			if (d)
 				*d = dGain;
 		}
 
 		float operator()(float error) {
 			// calculate the integral state with approriate limiting
-			float iState = 0.0;
+			//iState = 0.0;
 			// only accumulate error while in band
 			if (fabs(error) < iBand) {
-				iState = iState + error;
+				iState += error;
 			}
 			// limit accumulator to bounds iMax, iMin
 			if (iState > iMax) {

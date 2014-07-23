@@ -341,9 +341,10 @@ class L3G4200D {
 				_delay_ms(10);
 			}
 
-			gyroZero[0] = zero[0] / samples;
-			gyroZero[1] = zero[1] / samples;
-			gyroZero[2] = zero[2] / samples;
+			//FIXME
+			gyroZero[0] = 0.0;//zero[0] / samples;
+			gyroZero[1] = 0.0;//zero[1] / samples;
+			gyroZero[2] = 0.0;//zero[2] / samples;
 		}
 };
 

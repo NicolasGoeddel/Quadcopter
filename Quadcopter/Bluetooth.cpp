@@ -7,22 +7,35 @@
 
 #include "Bluetooth.h"
 
+#include "DEBUG.h"
+
 Bluetooth::Bluetooth(uint32_t baud) {
 	USART_init(baud);
 }
 
-void Bluetooth::getString(char* buffer, uint8_t length) {
+void Bluetooth::getData(uint8_t* buffer, uint8_t length) {
 	while (length) {
 		*buffer = getChar();
-		if (*buffer == '\r' || *buffer == '\n') {
+		buffer++;
+		length--;
+	}
+}
+
+uint8_t Bluetooth::getString(char* buffer, uint8_t length) {
+	uint8_t read = 0;
+	while (length) {
+		*buffer = getChar();
+		if ((*buffer == 13) || (*buffer == 10) || (*buffer == 0)) {
 			break;
 		}
 		buffer++;
 		length--;
+		read++;
 	}
 	if (length > 0) {
 		*buffer = '\0';
 	}
+	return read;
 }
 
 void Bluetooth::changeDeviceName(const char* deviceName) {

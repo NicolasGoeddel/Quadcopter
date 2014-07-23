@@ -60,6 +60,7 @@ extern "C" void __cxa_pure_virtual() {
 #include "Clock.h"
 #include "myMath.h"
 #include "Motor.h"
+#include "myMath.h"
 
 //#define DEBUG_DMA
 //#define DEBUG_RF
@@ -102,6 +103,47 @@ int main() {
 #endif
 
 #ifdef MAIN_PROGRAM
+
+bool strEqual(char * a, char * b, uint8_t length = 255) {
+	while (length && *a && *b) {
+		if (*a != *b) {
+			return false;
+		}
+		a++;
+		b++;
+		length--;
+	}
+
+	return (*a == *b) || (length == 0);
+}
+
+bool readPID(Bluetooth* bt, float & p, float & i, float & d) {
+	if (bt->isDataAvailable()) {
+		char c = bt->getChar();
+		if (c == 's') {
+			DEBUG_LED(1);
+			struct {
+					float p, i, d;
+			} pidBuffer;
+			bt->getData((uint8_t*) &pidBuffer, 12);
+			DEBUG_LED(0);
+			p = pidBuffer.p;
+			i = pidBuffer.i;
+			d = pidBuffer.d;
+//			p = Myatof(buffer);
+//			i = Myatof(buffer + 4);
+//			d = Myatof(buffer + 8);
+			return true;
+		} else if (c == 'g') {
+			bt->write("pid\n");
+			bt->writeFloatRaw(p);
+			bt->writeFloatRaw(i);
+			bt->writeFloatRaw(d);
+		}
+	}
+	return false;
+}
+
 int main() {
 	set32MHz();
 	_delay_ms(10);
@@ -205,11 +247,11 @@ int main() {
 	#define MAX_ANGLE_RAD (MAX_ANGLE_DEG * 0.017453293)
 
 	// Einstellung für die PID-Regler
-	#define PID_P 0.01746
-	#define PID_I 0.03175
-	#define PID_D 0 //0.0024
-	#define PID_I_Min -0.1
-	#define PID_I_Max -0.1
+	#define PID_P 0.072
+	#define PID_I 0.12
+	#define PID_D 0.0108 //0.0024
+	#define PID_I_Min -0.01
+	#define PID_I_Max 0.01
 	#define PID_I_Band 0.2
 	#define PID_Scale 1.0 //0.06
 
@@ -236,7 +278,7 @@ int main() {
 	for (;;) {
 		if (clock.eventInterrupt) {
 			// Debug LED an
-			DEBUG_LED(1);
+			DEBUG_LED(0);
 
 			// Gyro und Beschleunigungssensor auslesen
 			gyro.measure();
@@ -251,7 +293,9 @@ int main() {
 			// Winkel aus Beschleunigung und Gyro berechnen
 			angleX = filterX(acc.angleX(), gyro.x());
 			angleY = filterY(acc.angleY(), gyro.y());
-			angleZ += gyro.z() * dT;
+			if (gyro.z() > 10) {
+				angleZ += gyro.z() * dT;
+			}
 
 			// Fernbedienung auslesen
 			uint8_t remoteX, remoteY, remoteState, remotePushed;
@@ -289,13 +333,13 @@ int main() {
 #			ifdef DISPLAY
 			float p, i, d;
 			pidX.getPID(&p, &i, &d);
-//			display.setCursorPos(0, 0)->write("p:")->writeFloat(p);
-//			display.setCursorPos(1, 0)->write("i:")->writeFloat(i);
-//			display.setCursorPos(2, 0)->write("d:")->writeFloat(d);
-			display.setCursorPos(0, 0)->write("a:")->writeInt4(acc.x() * 100, acc.y() * 100, acc.z() * 100);
-			display.setCursorPos(1, 0)->write("w:")->writeInt4(DEG(angleX), DEG(angleY), DEG(angleZ));
+			display.setCursorPos(0, 0)->write("p:")->writeFloat(p);
+			display.setCursorPos(1, 0)->write("i:")->writeFloat(i);
+			display.setCursorPos(2, 0)->write("d:")->writeFloat(d);
+//			display.setCursorPos(0, 0)->write("a:")->writeInt4(acc.x() * 100, acc.y() * 100, acc.z() * 100);
+//			display.setCursorPos(1, 0)->write("w:")->writeInt4(DEG(angleX), DEG(angleY), DEG(angleZ));
 //			display.setCursorPos(2, 0)->write("p:")->writeInt4(DEG(pidAngleX), DEG(pidAngleY), DEG(angleZ));
-			display.setCursorPos(2, 0)->write("a:")->writeInt4(gyro.x() * 100, gyro.y() * 100, gyro.z() * 100);
+//			display.setCursorPos(2, 0)->write("a:")->writeInt4(gyro.x() * 100, gyro.y() * 100, gyro.z() * 100);
 //			display.setCursorPos(0, 0)->write("gx:")->writeInt(gyro.x() * 100);
 //			display.setCursorPos(1, 0)->write("gy:")->writeInt(gyro.y() * 100);
 //			display.setCursorPos(2, 0)->write("gz:")->writeInt(gyro.z() * 100);
@@ -311,7 +355,8 @@ int main() {
 //				bt.write("a:")->writeFloat(acc.x())->writeFloat(acc.y())->writeFloat(acc.z());
 //				bt.write(" g:")->writeFloat(gyro.x())->writeFloat(gyro.y())->writeFloat(gyro.z());
 //				bt.writeChar(13);
-				bt.writeFloatRaw(NAN);
+				bt.write("sensors\n");
+				//bt.writeFloatRaw(NAN);
 				bt.writeUint32Raw(clock.milliSeconds);
 				bt.writeFloatRaw(acc.x());
 				bt.writeFloatRaw(acc.y());
@@ -319,6 +364,17 @@ int main() {
 				bt.writeFloatRaw(gyro.x());
 				bt.writeFloatRaw(gyro.y());
 				bt.writeFloatRaw(gyro.z());
+				bt.writeFloatRaw(angleX);
+				bt.writeFloatRaw(angleY);
+				bt.writeFloatRaw(angleZ);
+				bt.writeFloatRaw(pidAngleX);
+				bt.writeFloatRaw(pidAngleY);
+				bt.writeFloatRaw(0.0);
+
+				if (readPID(&bt, p, i, d)) {
+					pidX.setPID(p, i, d);
+					pidY.setPID(p, i, d);
+				}
 			}
 #			endif
 

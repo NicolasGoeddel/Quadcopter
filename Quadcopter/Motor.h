@@ -71,7 +71,8 @@ class Motor {
 			diffDC = fullDC - zeroDC;
 			DC[0] = DC[1] = DC[2] = DC[3] = zeroDC;
 			setPWM(0);
-			_delay_ms(3000);
+			//FIXME Vielleicht muss da auch noch ein kleines Delay rein. Ich weiß nicht so genau...
+			//_delay_ms(3000);
 		}
 
 		~Motor();
@@ -100,9 +101,10 @@ class Motor {
 		}
 
 		void setSpeed(float m1, float m2, float m3, float m4) {
-			DC[0] = zeroDC + diffDC * cutBorders(m1);
+			//FIXME
+			DC[0] = zeroDC;// + diffDC * cutBorders(m1);
 			DC[1] = zeroDC + diffDC * cutBorders(m2);
-			DC[2] = zeroDC + diffDC * cutBorders(m3);
+			DC[2] = zeroDC;// + diffDC * cutBorders(m3);
 			DC[3] = zeroDC + diffDC * cutBorders(m4);
 			setPWM();
 		}

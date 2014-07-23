@@ -10,6 +10,18 @@
 
 #include <avr/io.h>
 
+class USART {
+	private:
+	public:
+		USART() {
+
+		}
+
+		~USART() {
+
+		}
+};
+
 #define USART_PORT USARTD1
 
 /**

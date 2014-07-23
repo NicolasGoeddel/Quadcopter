@@ -164,3 +164,30 @@ float myAtan2(float y, float x) {
 	}
 	return val + M_PI;
 }
+
+float Myatof(char * value) {
+	float f;
+	// Skip all chars other to 0..9
+	while (*value) {
+		if ((*value >= '0' && *value <= '9') || *value == '.') break;
+		value++;
+	}
+	// Read all digits before the point
+	while (*value) {
+		if (*value < '0' || *value > '9') break;
+		f = f * 10.0 + (*value - '0');
+		value++;
+	}
+	if (*value == '.') {
+		value++;
+		// Read all digits
+		float mult = 0.1;
+		while (*value) {
+			if (*value < '0' || *value > '9') break;
+			f += (*value - '0') * mult;
+			mult *= 0.1;
+			value++;
+		}
+	}
+	return f;
+}

@@ -75,4 +75,6 @@ float arctan2(float x, float y);
 float myAtan2(float y, float x);
 float myAtan(float x);
 
+float Myatof(char * value);
+
 #endif /* MATH_H_ */

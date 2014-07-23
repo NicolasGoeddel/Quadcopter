@@ -47,6 +47,14 @@ class Bluetooth : public StringDevice<Bluetooth> {
 		 */
 		bool setBaud(uint32_t baud);
 
+		/**
+		 * Stellt fest, ob Daten vorhanden sind, die ausgelesen werden können.
+		 * @return true, wenn Daten vorhanden sind, sonst false.
+		 */
+		bool isDataAvailable() {
+			return USART_dataAvailable();
+		}
+
 		using StringDevice<Bluetooth>::write;
 
 		/**
@@ -89,6 +97,17 @@ class Bluetooth : public StringDevice<Bluetooth> {
 		}
 
 		/**
+		 * Liest eine bestimmte Anzahl Bytes vom Bluetooth-Adapter
+		 * und speichert sie in dem übergebenen Puffer.
+		 *
+		 * @param buffer Der Puffer, in dem die Bytes gespeichert werden
+		 *               sollen.
+		 * @param length Die Anzahl der zu lesenden Bytes. Üblicherweise
+		 *               ist dieser so groß wie der Puffer.
+		 */
+		void getData(uint8_t* buffer, uint8_t length);
+
+		/**
 		 * Liest einen Zeilen-terminierten String vom Bluetooth-Adapter
 		 * aus. Bei \r oder \n wird aufgehört zu lesen. Wenn der
 		 * übergebene Puffer nicht ausreicht, wird das Lesen ebenfalls
@@ -98,8 +117,9 @@ class Bluetooth : public StringDevice<Bluetooth> {
 		 * @param buffer Der Puffer, in den der String gespeichert werden
 		 *               soll.
 		 * @param length Die Größe des Puffers.
+		 * @return Gibt die gelesenen Zeichen zurück. Ohne Nullbyte.
 		 */
-		void getString(char* buffer, uint8_t length);
+		uint8_t getString(char* buffer, uint8_t length);
 
 		/**
 		 * Ändert den Namen des Bluetooth-Adapters.
