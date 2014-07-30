@@ -273,6 +273,7 @@ int main() {
 	motor.setSpeed(0);
 	_delay_ms(400);
 
+	DEBUG_LED(1);
 	Clock clock;
 
 	for (;;) {

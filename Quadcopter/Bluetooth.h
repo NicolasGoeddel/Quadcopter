@@ -24,7 +24,7 @@
  * Werk aus die Baudrate 9600 nutzt. Das heißt beim ersten Mal sollte
  * man die Klasse mit der Baudrate 9600 initialisieren.
  */
-class Bluetooth : public StringDevice<Bluetooth> {
+class Bluetooth : public StringDeviceOut<Bluetooth> {
 	private:
 		USART* usart;
 	public:
@@ -58,7 +58,7 @@ class Bluetooth : public StringDevice<Bluetooth> {
 			//return USART_dataAvailable();
 		}
 
-		using StringDevice<Bluetooth>::write;
+		using StringDeviceOut<Bluetooth>::write;
 
 		/**
 		 * Wenn der Bluetooth-Adapter verbunden ist, wird dadurch

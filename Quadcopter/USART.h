@@ -17,6 +17,7 @@ class USART : StringDevice<USART> {
 		PORT_t* port;
 		uint32_t baudRate;
 		uint32_t cpuFreq;
+
 	public:
 		USART(USART_t* usart, PORT_t* port) {
 			this->usart = usart;
@@ -26,7 +27,6 @@ class USART : StringDevice<USART> {
 		}
 
 		~USART() {
-
 		}
 
 		void setCPUFrequency(uint32_t cpuFreq) {

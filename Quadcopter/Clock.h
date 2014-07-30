@@ -11,6 +11,7 @@
 #include "XMEGA_helper.h"
 #include <avr/io.h>
 #include "DEBUG.h"
+#include "InterruptHelper.h"
 
 #define TIMER_FREQUENCY 50
 
@@ -21,12 +22,21 @@
  * Programm. Das muss zukünftig noch irgendwie anders
  * gelöst werden, damit die Hauptschleife sauber läuft.
  */
-class Clock {
+class Clock : Interrupt {
 	public:
 		volatile bool eventInterrupt;
 		volatile uint32_t milliSeconds;
 		Clock();
 		~Clock() {};
+
+		/**
+		 * Der Interrupt, der mit einer Frequenz von
+		 * TIMER_FREQUENCY ausgelöst wird.
+		 */
+		void interrupt() {
+			eventInterrupt = 1;
+			milliSeconds += 1000 / TIMER_FREQUENCY;
+		}
 };
 
 #endif /* CLOCK_H_ */

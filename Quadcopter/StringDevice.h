@@ -14,7 +14,7 @@
 #include <string.h>
 
 template <class ReturnType>
-class StringDevice {
+class StringDeviceOut {
 	private:
 		void static zeroString(char * buf, uint8_t length) {
 			for (uint8_t i = 0; i < length; i++) {
@@ -22,7 +22,7 @@ class StringDevice {
 			}
 		}
 	public:
-		virtual ~StringDevice() {};
+		virtual ~StringDeviceOut() {};
 
 		virtual ReturnType* writeChar(const char c) = 0;
 
@@ -141,6 +141,12 @@ class StringDevice {
 			return (ReturnType*) this;
 		}
 
+};
+
+template <class ReturnType>
+class StringDevice : public StringDeviceOut<ReturnType> {
+	public:
+		virtual ~StringDevice() {};
 };
 
 #endif /* STRINGDEVICE_H_ */

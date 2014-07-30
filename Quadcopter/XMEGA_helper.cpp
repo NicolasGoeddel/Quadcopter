@@ -34,6 +34,22 @@
 
 #include "XMEGA_helper.h"
 
+DMA_CH_t* getFreeDMAChannel() {
+	if (!(DMA.CH0.CTRLA & DMA_CH_ENABLE_bm)) {
+		return &DMA.CH0;
+	}
+	if (!(DMA.CH1.CTRLA & DMA_CH_ENABLE_bm)) {
+		return &DMA.CH1;
+	}
+	if (!(DMA.CH2.CTRLA & DMA_CH_ENABLE_bm)) {
+		return &DMA.CH2;
+	}
+	if (!(DMA.CH3.CTRLA & DMA_CH_ENABLE_bm)) {
+		return &DMA.CH3;
+	}
+	return 0;
+}
+
 void set32MHz() {
 	OSC.CTRL = OSC_RC32MEN_bm; //enable 32MHz oscillator
 	while(!(OSC.STATUS & OSC_RC32MRDY_bm));   //wait for stability

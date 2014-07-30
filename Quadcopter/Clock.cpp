@@ -9,18 +9,10 @@
 
 volatile Clock* object_Clock = 0;
 
-/**
- * Der Interrupt, der mit einer Frequenz von
- * TIMER_FREQUENCY ausgelöst wird.
- */
-ISR(TCD1_OVF_vect) {
-	object_Clock->eventInterrupt = 1;
-	object_Clock->milliSeconds += 1000 / TIMER_FREQUENCY;
-}
-
 Clock::Clock() {
 	object_Clock = this;
 	milliSeconds = 0;
 	eventInterrupt = 0;
 	configureInterrupt(TCD1, TIMER_FREQUENCY);
+	addToInterrupt(TCD1_OVF_vect_num);
 }

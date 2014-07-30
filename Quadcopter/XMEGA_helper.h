@@ -40,6 +40,8 @@
 
 void set32MHz();
 
+DMA_CH_t* getFreeDMAChannel();
+
 void inline activateInterrupts() {
 	PMIC.CTRL = PMIC_MEDLVLEN_bm | PMIC_LOLVLEN_bm | PMIC_HILVLEN_bm;
 	sei();
