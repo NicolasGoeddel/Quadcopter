@@ -28,7 +28,7 @@ void DEBUG_init();
  *              1 - LED an.
  *              sonst - Toggle LED.
  */
-void DEBUG_LED(int8_t state);
+void DEBUG_LED(int8_t state = 2);
 
 /**
  * Lässt die LED in einem festen Intervall von 300 ms

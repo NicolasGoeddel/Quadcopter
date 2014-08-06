@@ -11,7 +11,6 @@
 #include <avr/io.h>
 #include <avr/interrupt.h>
 #include <stdlib.h>
-#include "DEBUG.h"
 
 #if (_VECTORS_SIZE / _VECTOR_SIZE > 255)
 	typedef uint16_t INTERRUPT_NUM_t;

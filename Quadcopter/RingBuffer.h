@@ -23,10 +23,9 @@ class RingBufferOutDMA : Interrupt, public StringDeviceOut<RingBufferOutDMA<Capa
 		CapacityType free;
 		CapacityType size;
 		uint8_t* buffer;
-		bool isrDone;
+		volatile bool isrDone;
 		DMA_CH_t* dma;
 		uint8_t* destination;
-		register8_t triggerSource;
 
 		CapacityType writeBuf(char* buf, CapacityType len) {
 			if (len > size) {
@@ -68,7 +67,7 @@ class RingBufferOutDMA : Interrupt, public StringDeviceOut<RingBufferOutDMA<Capa
 				dma->SRCADDR1 = (srcAddr >> 8) & 0xff;
 				dma->SRCADDR2 = 0;
 				dma->TRFCNT = transferLen;
-				dma->CTRLA |= DMA_CH_ENABLE_bm;
+				dma->CTRLA |= DMA_CH_ENABLE_bm | DMA_CH_TRFREQ_bm;
 
 				isrDone = false;
 			}
@@ -145,9 +144,8 @@ class RingBufferOutDMA : Interrupt, public StringDeviceOut<RingBufferOutDMA<Capa
 				interruptNum = DMA_CH3_vect_num;
 			}
 
-			buffer = new uint8_t(size);
+			buffer = (uint8_t*) malloc(size);
 			this->destination = destination;
-			this->triggerSource = triggerSource;
 
 			dma->SRCADDR0 = 0;
 			dma->SRCADDR1 = 0;
@@ -180,11 +178,13 @@ class RingBufferOutDMA : Interrupt, public StringDeviceOut<RingBufferOutDMA<Capa
 			return this;
 		}
 
-		void writeCharISR(char c) {
+		RingBufferOutDMA* writeCharISR(char c) {
 			writeBufISR(&c, 1);
+			return this;
 		}
 
 		void interrupt() {
+			//DEBUG_LED(2);
 			// Is DMA_TX_Channel still busy?
 			if (dma->CTRLB & DMA_CH_CHBUSY_bm) {
 				return;

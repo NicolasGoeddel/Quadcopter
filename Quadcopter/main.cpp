@@ -40,37 +40,60 @@
  */
 extern "C" void __cxa_pure_virtual() {
 	while (true) {
-		DEBUG_LED(-1);
+		DEBUG_LED();
 		_delay_ms(100);
 	}
 }
 
+#define DISPLAY
+#define REMOTE
+//#define BLUETOOTH
+
 #include <stdlib.h>
 #include <avr/io.h>
+// Ein paar Hilfsfunktionen, die später nochmal heraus "operiert" werden
 #include "XMEGA_helper.h"
-#include "Display.h"
-#include "Bluetooth.h"
+
+#ifdef DISPLAY
+#	include "Display.h"
+#endif
+
+#ifdef BLUETOOTH
+#	include "Bluetooth.h"
+#endif
+
+// Die Klassen für die Sensoren
 #include "ADXL345.h"
 #include "L3G4200D.h"
+
+// Der PID-Regler
 #include "PID.h"
+
+// Der Komplementärfilter
 #include "CFilter.h"
+
+// Ein paar Mathefunktionen
 #include "myMath.h"
+
+// Die DMA-Controller-Klasse
 #include "DMAController.h"
-#include "Transmitter.h"
+
+// Die Klasse für die Fernbedienung
+#ifdef REMOTE
+#	include "Transmitter.h"
+#endif
+
+// Die Klasse für die Zeitsteuerung
 #include "Clock.h"
-#include "myMath.h"
+
+// Die Klasse um die Motoren zu steuern
 #include "Motor.h"
-#include "myMath.h"
 
 //#define DEBUG_DMA
 //#define DEBUG_RF
 //#define DEBUG_USART
 //#define DEBUG_TEST
 #define MAIN_PROGRAM
-
-#define DISPLAY
-#define REMOTE
-#define BLUETOOTH
 
 /* Port-Map
  *	PORT	BITS	PIN		Beschreibung
@@ -117,22 +140,20 @@ bool strEqual(char * a, char * b, uint8_t length = 255) {
 	return (*a == *b) || (length == 0);
 }
 
+#ifdef BLUETOOTH
 bool readPID(Bluetooth* bt, float & p, float & i, float & d) {
 	if (bt->isDataAvailable()) {
 		char c = bt->getChar();
 		if (c == 's') {
-			DEBUG_LED(1);
+			//DEBUG_LED(1);
 			struct {
 					float p, i, d;
 			} pidBuffer;
 			bt->getData((uint8_t*) &pidBuffer, 12);
-			DEBUG_LED(0);
+			//DEBUG_LED(0);
 			p = pidBuffer.p;
 			i = pidBuffer.i;
 			d = pidBuffer.d;
-//			p = Myatof(buffer);
-//			i = Myatof(buffer + 4);
-//			d = Myatof(buffer + 8);
 			return true;
 		} else if (c == 'g') {
 			bt->write("pid\n");
@@ -143,6 +164,7 @@ bool readPID(Bluetooth* bt, float & p, float & i, float & d) {
 	}
 	return false;
 }
+#endif
 
 int main() {
 	set32MHz();
@@ -279,7 +301,7 @@ int main() {
 	for (;;) {
 		if (clock.eventInterrupt) {
 			// Debug LED an
-			DEBUG_LED(0);
+			DEBUG_LED(1);
 
 			// Gyro und Beschleunigungssensor auslesen
 			gyro.measure();

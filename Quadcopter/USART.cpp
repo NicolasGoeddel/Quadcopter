@@ -61,6 +61,36 @@ bool USART::init(uint32_t baudRate) {
 	return setBaudrate(baudRate);
 }
 
+#define GET_TRIGGER_SOURCE(name) if (usart == &name) return DMA_CH_TRIGSRC_##name##_DRE_gc;
+register8_t USART::getTriggerSource(USART_t* usart) {
+#	ifdef USARTC0
+	GET_TRIGGER_SOURCE(USARTC0)
+#	endif
+#	ifdef USARTC1
+	GET_TRIGGER_SOURCE(USARTC1)
+#	endif
+#	ifdef USARTD0
+	GET_TRIGGER_SOURCE(USARTD0)
+#	endif
+#	ifdef USARTD1
+	GET_TRIGGER_SOURCE(USARTD1)
+#	endif
+#	ifdef USARTE0
+	GET_TRIGGER_SOURCE(USARTE0)
+#	endif
+#	ifdef USARTE1
+	GET_TRIGGER_SOURCE(USARTE1)
+#	endif
+#	ifdef USARTF0
+	GET_TRIGGER_SOURCE(USARTF0)
+#	endif
+#	ifdef USARTF1
+	GET_TRIGGER_SOURCE(USARTF1)
+#	endif
+	return 0;
+}
+#undef GET_TRIGGER_SOURCE
+
 bool USART::setBaudrate(uint32_t baudRate) {
 	this->baudRate = baudRate;
 

@@ -10,7 +10,7 @@
 #include "DEBUG.h"
 
 Bluetooth::Bluetooth(USART_t* usart, PORT_t* port, uint32_t baud) {
-	this->usart = new USART(usart, port);
+	this->usart = new USART(usart, port, true);
 	this->usart->setBaudrate(baud);
 	//USART_init(baud);
 }
@@ -53,6 +53,7 @@ bool Bluetooth::isDeviceOk() {
 	if (getChar() != 'O') {
 		return false;
 	}
+	DEBUG_LED(0);
 	if (getChar() != 'K') {
 		return false;
 	}

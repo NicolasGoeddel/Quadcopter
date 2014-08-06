@@ -10,6 +10,7 @@
 
 #include <avr/io.h>
 #include "StringDevice.h"
+#include "RingBuffer.h"
 
 class USART : StringDevice<USART> {
 	private:
@@ -17,13 +18,27 @@ class USART : StringDevice<USART> {
 		PORT_t* port;
 		uint32_t baudRate;
 		uint32_t cpuFreq;
+		bool useDMA;
+		RingBufferOutDMA<uint8_t>* rb;
+
+		static register8_t getTriggerSource(USART_t* usart);
 
 	public:
-		USART(USART_t* usart, PORT_t* port) {
+		USART(USART_t* usart, PORT_t* port, bool useDMA = false) {
 			this->usart = usart;
 			this->port = port;
 			cpuFreq = F_CPU;
 			init(9600);
+			if (useDMA) {
+				register8_t triggerSource = getTriggerSource(usart);
+
+				if (triggerSource == 0) {
+					this->useDMA = false;
+				} else {
+					this->useDMA = true;
+					rb = new RingBufferOutDMA<uint8_t>(100, 0, (uint8_t*) &usart->DATA, triggerSource);
+				}
+			}
 		}
 
 		~USART() {
@@ -60,13 +75,17 @@ class USART : StringDevice<USART> {
 		using StringDevice<USART>::write;
 
 		USART* writeChar(const char c) {
-			while(!(usart->STATUS & USART_DREIF_bm));
+			if (useDMA) {
+				rb->writeChar(c);
+			} else {
+				while(!(usart->STATUS & USART_DREIF_bm));
 
-			USARTD1.DATA = c;
+				USARTD1.DATA = c;
+			}
 			return this;
 		}
 
-		char receiveChar(){
+		char receiveChar() {
 			while (!(usart->STATUS & USART_RXCIF_bm));
 
 			return ((uint8_t)usart->DATA);

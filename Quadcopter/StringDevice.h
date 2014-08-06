@@ -140,7 +140,6 @@ class StringDeviceOut {
 			write(buf);
 			return (ReturnType*) this;
 		}
-
 };
 
 template <class ReturnType>

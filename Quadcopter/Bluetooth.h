@@ -69,7 +69,6 @@ class Bluetooth : public StringDeviceOut<Bluetooth> {
 		 */
 		Bluetooth* writeChar(const char c) {
 			usart->writeChar(c);
-			//USART_putchar(c);
 			return this;
 		}
 
@@ -82,7 +81,6 @@ class Bluetooth : public StringDeviceOut<Bluetooth> {
 		 */
 		char getChar(void)	{
 			return usart->receiveChar();
-		    //return USART_getchar();
 		}
 
 		/**
@@ -98,8 +96,6 @@ class Bluetooth : public StringDeviceOut<Bluetooth> {
 		char getCharAsync(void)	{
 			if (usart->isDataAvailable())
 				return usart->receiveChar();
-//			if (USART_dataAvailable())
-//				return USART_getchar();
 			return '\0';
 		}
 
