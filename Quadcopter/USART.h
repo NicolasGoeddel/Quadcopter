@@ -21,8 +21,6 @@ class USART : StringDevice<USART> {
 		bool useDMA;
 		RingBufferOutDMA<uint8_t>* rb;
 
-		static register8_t getTriggerSource(USART_t* usart);
-
 	public:
 		USART(USART_t* usart, PORT_t* port, bool useDMA = false) {
 			this->usart = usart;
@@ -38,8 +36,12 @@ class USART : StringDevice<USART> {
 					this->useDMA = true;
 					rb = new RingBufferOutDMA<uint8_t>(100, 0, (uint8_t*) &usart->DATA, triggerSource);
 				}
+			} else {
+				this->useDMA = false;
 			}
 		}
+
+		static register8_t getTriggerSource(USART_t* usart);
 
 		~USART() {
 		}

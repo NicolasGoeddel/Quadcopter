@@ -47,7 +47,7 @@ extern "C" void __cxa_pure_virtual() {
 
 #define DISPLAY
 #define REMOTE
-//#define BLUETOOTH
+#define BLUETOOTH
 
 #include <stdlib.h>
 #include <avr/io.h>
@@ -93,7 +93,8 @@ extern "C" void __cxa_pure_virtual() {
 //#define DEBUG_RF
 //#define DEBUG_USART
 //#define DEBUG_TEST
-#define MAIN_PROGRAM
+//#define MAIN_PROGRAM
+#define DEBUG_DMA2
 
 /* Port-Map
  *	PORT	BITS	PIN		Beschreibung
@@ -522,6 +523,40 @@ int main() {
 			display.write(input);
 		}
 	}
+}
+#endif
+
+#ifdef DEBUG_DMA2
+int main() {
+	set32MHz();
+	_delay_ms(100);
+
+	DEBUG_init();
+
+	DEBUG_LED_blink(4);
+
+	DEBUG_LED(1);
+
+	Display display(PORTC);
+	display.init();
+
+	// Reset DMA
+	DMA.CTRL = 0;
+	DMA.CTRL = DMA_RESET_bm;
+	while ((DMA.CTRL & DMA_RESET_bm) != 0);
+
+	activateInterrupts();
+
+	display.setCursorPos(0, 0)->write("Init Bluetooth");
+	Bluetooth bt(&USARTD1, &PORTD, 9600);
+	bt.write("Hello World.");
+	if (!bt.isDeviceOk()) {
+		display.setCursorPos(1, 0)->write("BLUETOOTH ERROR!");
+	} else {
+		display.setCursorPos(1, 0)->write("Bluetooth ok.");
+	}
+
+	while (true);
 }
 #endif
 

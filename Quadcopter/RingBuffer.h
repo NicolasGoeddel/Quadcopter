@@ -13,6 +13,7 @@
 #include "XMEGA_helper.h"
 #include "InterruptHelper.h"
 #include "StringDevice.h"
+#include "DEBUG.h"
 
 template <class CapacityType>
 class RingBufferOutDMA : Interrupt, public StringDeviceOut<RingBufferOutDMA<CapacityType> > {
@@ -67,7 +68,8 @@ class RingBufferOutDMA : Interrupt, public StringDeviceOut<RingBufferOutDMA<Capa
 				dma->SRCADDR1 = (srcAddr >> 8) & 0xff;
 				dma->SRCADDR2 = 0;
 				dma->TRFCNT = transferLen;
-				dma->CTRLA |= DMA_CH_ENABLE_bm | DMA_CH_TRFREQ_bm;
+				dma->CTRLA |= DMA_CH_ENABLE_bm;
+				//dma->CTRLA |= DMA_CH_TRFREQ_bm;
 
 				isrDone = false;
 			}
@@ -113,6 +115,7 @@ class RingBufferOutDMA : Interrupt, public StringDeviceOut<RingBufferOutDMA<Capa
 				dma->SRCADDR2 = 0;
 				dma->TRFCNT = transferLen;
 				dma->CTRLA |= DMA_CH_ENABLE_bm;
+				//dma->CTRLA |= DMA_CH_TRFREQ_bm;
 
 				isrDone = false;
 			}
@@ -184,7 +187,6 @@ class RingBufferOutDMA : Interrupt, public StringDeviceOut<RingBufferOutDMA<Capa
 		}
 
 		void interrupt() {
-			//DEBUG_LED(2);
 			// Is DMA_TX_Channel still busy?
 			if (dma->CTRLB & DMA_CH_CHBUSY_bm) {
 				return;
@@ -222,10 +224,11 @@ class RingBufferOutDMA : Interrupt, public StringDeviceOut<RingBufferOutDMA<Capa
 				dma->SRCADDR2 = 0;
 				dma->TRFCNT = len;
 				dma->CTRLA |= DMA_CH_ENABLE_bm;
+				//dma->CTRLA |= DMA_CH_TRFREQ_bm;
 			} else {
 				// otherwise reset the DMA channel
 				dma->TRFCNT = 0;
-				dma->CTRLA &= DMA_CH_ENABLE_bm;
+				dma->CTRLA &= ~DMA_CH_ENABLE_bm;
 			}
 
 			// since ERRIF and TRNIF share the same interrupt, we need to clear
