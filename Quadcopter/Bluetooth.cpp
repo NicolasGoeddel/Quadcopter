@@ -9,14 +9,13 @@
 
 #include "DEBUG.h"
 
-Bluetooth::Bluetooth(USART_t* usart, PORT_t* port, uint32_t baud) {
-	this->usart = new USART(usart, port, true);
-	this->usart->setBaudrate(baud);
+Bluetooth::Bluetooth(USART_t* usart, PORT_t* port, uint32_t baud) : USART(usart, port, true) {
+	setBaudrate(baud);
 }
 
 void Bluetooth::getData(uint8_t* buffer, uint8_t length) {
 	while (length) {
-		*buffer = getChar();
+		*buffer = receiveChar();
 		buffer++;
 		length--;
 	}
@@ -25,7 +24,7 @@ void Bluetooth::getData(uint8_t* buffer, uint8_t length) {
 uint8_t Bluetooth::getString(char* buffer, uint8_t length) {
 	uint8_t read = 0;
 	while (length) {
-		*buffer = getChar();
+		*buffer = receiveChar();
 		if ((*buffer == 13) || (*buffer == 10) || (*buffer == 0)) {
 			break;
 		}
@@ -42,17 +41,17 @@ uint8_t Bluetooth::getString(char* buffer, uint8_t length) {
 void Bluetooth::changeDeviceName(const char* deviceName) {
 	write("AT+NAME")->write(deviceName);
 	while (*deviceName) {
-		getChar();
+		receiveChar();
 		deviceName++;
 	}
 }
 
 bool Bluetooth::isDeviceOk() {
 	write("AT");
-	if (getChar() != 'O') {
+	if (receiveChar() != 'O') {
 		return false;
 	}
-	if (getChar() != 'K') {
+	if (receiveChar() != 'K') {
 		return false;
 	}
 	return true;
@@ -89,10 +88,10 @@ bool Bluetooth::setBaud(uint32_t baud) {
 	/* Überprüfe Rückgabewert, OK<r>, wobei <r> gleich die Baudrate
 	 * in Dezimalform sein muss
 	 */
-	if (getChar() != 'O') {
+	if (receiveChar() != 'O') {
 		return false;
 	}
-	if (getChar() != 'K') {
+	if (receiveChar() != 'K') {
 		return false;
 	}
 
@@ -102,7 +101,7 @@ bool Bluetooth::setBaud(uint32_t baud) {
 		 */
 		char expected = baud / h;
 		// Überprüfe, ob die Ziffer auch zurück gegeben wurde.
-		if (getChar() != expected) {
+		if (receiveChar() != expected) {
 			return false;
 		}
 		// Lösche die höchste Ziffer
@@ -112,7 +111,7 @@ bool Bluetooth::setBaud(uint32_t baud) {
 	}
 
 	// Setze jetzt auch die Baudrate vom USART neu
-	usart->setBaudrate(baud);
+	setBaudrate(baud);
 	//USART_setBaudrate(baud);
 
 	return true;

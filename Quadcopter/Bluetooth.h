@@ -24,9 +24,7 @@
  * Werk aus die Baudrate 9600 nutzt. Das heißt beim ersten Mal sollte
  * man die Klasse mit der Baudrate 9600 initialisieren.
  */
-class Bluetooth : public StringDeviceOut<Bluetooth> {
-	private:
-		USART* usart;
+class Bluetooth : public USART {
 	public:
 		/**
 		 * Erstelle ein Objekt der Bluetooth-Klasse mit einer bestimmten
@@ -50,40 +48,6 @@ class Bluetooth : public StringDeviceOut<Bluetooth> {
 		bool setBaud(uint32_t baud);
 
 		/**
-		 * Stellt fest, ob Daten vorhanden sind, die ausgelesen werden können.
-		 * @return true, wenn Daten vorhanden sind, sonst false.
-		 */
-		bool isDataAvailable() {
-			return usart->isDataAvailable();
-			//return USART_dataAvailable();
-		}
-
-		using StringDeviceOut<Bluetooth>::write;
-
-		/**
-		 * Wenn der Bluetooth-Adapter verbunden ist, wird dadurch
-		 * ein Zeichen an den Empfänger gesendet. Ist er nicht verbunden
-		 * wird das Zeichen als Befehl an den Adapter selbst abgegeben.
-		 *
-		 * @param c Das zu sendende Zeichen.
-		 */
-		Bluetooth* writeChar(const char c) {
-			usart->writeChar(c);
-			return this;
-		}
-
-		/**
-		 * Liest ein Zeichen vom Bluetooth-Adapter. Kann nichts
-		 * gelesen werden, wird so lange gewartet, bis etwas
-		 * empfangen wurde.
-		 *
-		 * @return Das empfangene Zeichen.
-		 */
-		char getChar(void)	{
-			return usart->receiveChar();
-		}
-
-		/**
 		 * Liest ein Zeichen vom Bluetooth-Adapter bzw. direkt aus
 		 * dem Datenregister vom genutzten USART. Diese Funktion gibt
 		 * keine Garantie darauf, ob tatsächlich ein neues Zeichen
@@ -94,8 +58,8 @@ class Bluetooth : public StringDeviceOut<Bluetooth> {
 		 *         war.
 		 */
 		char getCharAsync(void)	{
-			if (usart->isDataAvailable())
-				return usart->receiveChar();
+			if (isDataAvailable())
+				return receiveChar();
 			return '\0';
 		}
 

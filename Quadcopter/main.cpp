@@ -93,8 +93,8 @@ extern "C" void __cxa_pure_virtual() {
 //#define DEBUG_RF
 //#define DEBUG_USART
 //#define DEBUG_TEST
-//#define MAIN_PROGRAM
-#define DEBUG_DMA2
+#define MAIN_PROGRAM
+//#define DEBUG_DMA2
 
 /* Port-Map
  *	PORT	BITS	PIN		Beschreibung
@@ -144,7 +144,7 @@ bool strEqual(char * a, char * b, uint8_t length = 255) {
 #ifdef BLUETOOTH
 bool readPID(Bluetooth* bt, float & p, float & i, float & d) {
 	if (bt->isDataAvailable()) {
-		char c = bt->getChar();
+		char c = bt->receiveChar();
 		if (c == 's') {
 			//DEBUG_LED(1);
 			struct {
@@ -549,7 +549,7 @@ int main() {
 
 	display.setCursorPos(0, 0)->write("Init Bluetooth");
 	Bluetooth bt(&USARTD1, &PORTD, 9600);
-	bt.write("Hello World.");
+	//bt.write("Hello World.");
 	if (!bt.isDeviceOk()) {
 		display.setCursorPos(1, 0)->write("BLUETOOTH ERROR!");
 	} else {

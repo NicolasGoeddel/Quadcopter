@@ -12,7 +12,7 @@
 #include "StringDevice.h"
 #include "RingBuffer.h"
 
-class USART : StringDevice<USART> {
+class USART : public StringDevice<USART> {
 	private:
 		USART_t* usart;
 		PORT_t* port;
@@ -83,6 +83,17 @@ class USART : StringDevice<USART> {
 				while(!(usart->STATUS & USART_DREIF_bm));
 
 				USARTD1.DATA = c;
+			}
+			return this;
+		}
+
+		USART* write(const char* c) {
+			if (useDMA) {
+				rb->writeBuf(c);
+			} else {
+				while (*c) {
+					writeChar(*c++);
+				}
 			}
 			return this;
 		}

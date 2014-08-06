@@ -28,101 +28,6 @@ class RingBufferOutDMA : Interrupt, public StringDeviceOut<RingBufferOutDMA<Capa
 		DMA_CH_t* dma;
 		uint8_t* destination;
 
-		CapacityType writeBuf(char* buf, CapacityType len) {
-			if (len > size) {
-				return 0;
-			}
-
-			// busy wait until there is enough space in the ringbuffer
-			while (free < len);
-
-			// busy wait until ISR is done
-			while (!isrDone);
-
-			for (CapacityType i = 0; i < len; i++) {
-				buffer[(writeIndex + i) % size] = buf[i];
-			}
-
-			// enter critical section
-			volatile uint8_t savedSreg = SREG;
-			cli();
-
-			writeIndex = (writeIndex + len) % size;
-			free -= len;
-			newDataLen += len;
-
-			// if there is no DMA transfer in progress already, initiate a new one
-			if (!(dma->CTRLB & DMA_CH_CHBUSY_bm) && !(dma->CTRLA & DMA_CH_ENABLE_bm) && isrDone) {
-				CapacityType maxLen = size - readIndex; //maximum length for this transfer
-				CapacityType transferLen;
-
-				// only transfer data up to the buffer boundary
-				if (newDataLen > maxLen) {
-					transferLen = maxLen;
-				} else {
-					transferLen = newDataLen;
-				}
-
-				uint16_t srcAddr = ((uint16_t) buf) + readIndex;
-				dma->SRCADDR0 = srcAddr & 0xff;
-				dma->SRCADDR1 = (srcAddr >> 8) & 0xff;
-				dma->SRCADDR2 = 0;
-				dma->TRFCNT = transferLen;
-				dma->CTRLA |= DMA_CH_ENABLE_bm;
-				//dma->CTRLA |= DMA_CH_TRFREQ_bm;
-
-				isrDone = false;
-			}
-
-			// Leave critical section
-			SREG = savedSreg;
-
-			return len;
-		}
-
-		CapacityType writeBufISR(char* buf, CapacityType len) {
-			if (len > size) {
-				return 0;
-			}
-
-			if (free < len) {
-				return 0;
-			}
-
-			for (CapacityType i = 0; i < len; i++) {
-				buffer[(writeIndex + i) % size] = buf[i];
-			}
-
-			writeIndex = (writeIndex + len) % size;
-			free -= len;
-			newDataLen += len;
-
-			// if there is no DMA transfer in progress already, initiate a new one
-			if (!(dma->CTRLB & DMA_CH_CHBUSY_bm) && !(dma->CTRLA & DMA_CH_ENABLE_bm) && isrDone) {
-				CapacityType maxLen = size - readIndex; //maximum length for this transfer
-				CapacityType transferLen;
-
-				// only transfer data up to the buffer boundary
-				if (newDataLen > maxLen) {
-					transferLen = maxLen;
-				} else {
-					transferLen = newDataLen;
-				}
-
-				uint16_t srcAddr = ((uint16_t) buf) + readIndex;
-				dma->SRCADDR0 = srcAddr & 0xff;
-				dma->SRCADDR1 = (srcAddr >> 8) & 0xff;
-				dma->SRCADDR2 = 0;
-				dma->TRFCNT = transferLen;
-				dma->CTRLA |= DMA_CH_ENABLE_bm;
-				//dma->CTRLA |= DMA_CH_TRFREQ_bm;
-
-				isrDone = false;
-			}
-
-			return len;
-		}
-
 	public:
 		RingBufferOutDMA(CapacityType size, DMA_CH_t* DMAChan, uint8_t* destination, register8_t triggerSource) {
 			readIndex = 0;
@@ -174,6 +79,74 @@ class RingBufferOutDMA : Interrupt, public StringDeviceOut<RingBufferOutDMA<Capa
 
 		~RingBufferOutDMA() {}
 
+		CapacityType writeBuf(const char* buf, CapacityType len = 0, bool inISR = false) {
+			if (len > size) {
+				return 0;
+			}
+
+			if (len == 0) {
+				// calculate length of string buffer
+				while (*buf) {
+					len++;
+					buf++;
+				}
+				buf -= len;
+			}
+
+			// busy wait until there is enough space in the ringbuffer
+			if (inISR) {
+				if (free < len) return 0;
+			} else {
+				while (free < len);
+				// busy wait until ISR is done
+				while (!isrDone);
+			}
+
+			for (CapacityType i = 0; i < len; i++) {
+				buffer[(writeIndex + i) % size] = buf[i];
+			}
+
+			volatile uint8_t savedSreg = SREG;
+			if (!inISR) {
+				// enter critical section
+				cli();
+			}
+
+			writeIndex = (writeIndex + len) % size;
+			free -= len;
+			newDataLen += len;
+
+			// if there is no DMA transfer in progress already, initiate a new one
+			if (!(dma->CTRLB & DMA_CH_CHBUSY_bm) && !(dma->CTRLA & DMA_CH_ENABLE_bm) && isrDone) {
+				CapacityType maxLen = size - readIndex; //maximum length for this transfer
+				CapacityType transferLen;
+
+				// only transfer data up to the buffer boundary
+				if (newDataLen > maxLen) {
+					transferLen = maxLen;
+				} else {
+					transferLen = newDataLen;
+				}
+
+				uint16_t srcAddr = ((uint16_t) buffer) + readIndex;
+				dma->SRCADDR0 = srcAddr & 0xff;
+				dma->SRCADDR1 = (srcAddr >> 8) & 0xff;
+				dma->SRCADDR2 = 0;
+				dma->TRFCNT = transferLen;
+				dma->CTRLA |= DMA_CH_ENABLE_bm;
+				//dma->CTRLA |= DMA_CH_TRFREQ_bm;
+
+				isrDone = false;
+			}
+
+			if (!inISR) {
+				// Leave critical section
+				SREG = savedSreg;
+			}
+
+			return len;
+		}
+
 		using StringDeviceOut<RingBufferOutDMA>::write;
 
 		RingBufferOutDMA* writeChar(char c) {
@@ -182,7 +155,7 @@ class RingBufferOutDMA : Interrupt, public StringDeviceOut<RingBufferOutDMA<Capa
 		}
 
 		RingBufferOutDMA* writeCharISR(char c) {
-			writeBufISR(&c, 1);
+			writeBuf(&c, 1, true);
 			return this;
 		}
 
