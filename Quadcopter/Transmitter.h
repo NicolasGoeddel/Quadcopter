@@ -50,6 +50,8 @@ class Transmitter {
 			wl_module_config();
 			configStatus = wl_module_config_verify();
 
+			//wl_module_tx_config(wl_module_TX_NR_1);
+
 			//wl_module_rx_config();
 			values[0] = values[1] = values[2] = values[3] = 0;
 		};

@@ -29,6 +29,7 @@ interruptFunc_t interruptFunctions[_VECTORS_SIZE / _VECTOR_SIZE];
  */
 
 declareISR(TCD1_OVF_vect)
+declareISR(USARTC0_RXC_vect)
 declareISR(DMA_CH0_vect)
 declareISR(DMA_CH1_vect)
 declareISR(DMA_CH2_vect)

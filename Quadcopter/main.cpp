@@ -46,8 +46,9 @@ extern "C" void __cxa_pure_virtual() {
 }
 
 #define DISPLAY
-#define REMOTE
-#define BLUETOOTH
+#define REMOTE		// Disables DEBUG_Button for standby speed.
+//#define BLUETOOTH
+#define MOTOR
 
 #include <stdlib.h>
 #include <avr/io.h>
@@ -93,11 +94,16 @@ extern "C" void __cxa_pure_virtual() {
 //#define DEBUG_RF
 //#define DEBUG_USART
 //#define DEBUG_TEST
-#define MAIN_PROGRAM
 //#define DEBUG_DMA2
+//#define DEBUG_DEBUG
+
+#if !(defined(DEBUG_DMA) || defined(DEBUG_RF) || defined(DEBUG_USART) || defined(DEBUG_TEST) || defined(DEBUG_DMA2) || defined(DEBUG_DEBUG))
+#	define MAIN_PROGRAM
+#endif
 
 /* Port-Map
  *	PORT	BITS	PIN		Beschreibung
+ *	A		0-1
  *	C		0-7		15-22	Display
  *	D		0-3		25-28	Motorsteuerung
  *	D		6-7		31-32	Bluetooth-Adapter
@@ -168,6 +174,7 @@ bool readPID(Bluetooth* bt, float & p, float & i, float & d) {
 #endif
 
 int main() {
+	disableJTAG();
 	set32MHz();
 	_delay_ms(10);
 
@@ -182,6 +189,7 @@ int main() {
 	display.clear();
 	_delay_ms(100);
 
+#	ifdef MOTOR
 	/* 0.1 ist der Dutycycle für die Motorcontroller,
 	 * bei dem die Motoren gerade aus sein sollten.
 	 * 0.2 ist der Dutycycle, bei dem die Motoren auf
@@ -189,6 +197,9 @@ int main() {
 	 */
 	Motor motor(PORTD, TCD0, 0.1, 0.20);
 	display.setCursorPos(0, 0)->write("PWM max=")->writeUint(motor.getMaxDC());
+#	else
+	display.setCursorPos(0, 0)->write("Motor off!")->writeUint(motor.getMaxDC());
+#	endif
 
 	//Aktiviere die Interrupts
 	activateInterrupts();
@@ -230,6 +241,8 @@ int main() {
 	} else {
 		display.setCursorPos(3, 0)->write("Remote ok.");
 	}
+#	else
+	display.setCursorPos(3, 0)->write("Remote off!");
 #	endif
 
 #	ifdef BLUETOOTH
@@ -240,6 +253,8 @@ int main() {
 	} else {
 		display.setCursorPos(0, 0)->write("Bluetooth ok.");
 	}
+#	else
+	display.setCursorPos(0, 0)->write("Bluetooth off!");
 #	endif
 
 	// Wenn ein Fehler aufgetreten ist, beende das Programm, damit man die Fehlermeldung sehen kann.
@@ -294,7 +309,7 @@ int main() {
 	float posZ = 0.0;
 
 	motor.setSpeed(0);
-	_delay_ms(400);
+	_delay_ms(2000);
 
 	DEBUG_LED(1);
 	Clock clock;
@@ -357,18 +372,28 @@ int main() {
 #			ifdef DISPLAY
 			float p, i, d;
 			pidX.getPID(&p, &i, &d);
+#if false	// Show PID
 			display.setCursorPos(0, 0)->write("p:")->writeFloat(p);
 			display.setCursorPos(1, 0)->write("i:")->writeFloat(i);
 			display.setCursorPos(2, 0)->write("d:")->writeFloat(d);
-//			display.setCursorPos(0, 0)->write("a:")->writeInt4(acc.x() * 100, acc.y() * 100, acc.z() * 100);
-//			display.setCursorPos(1, 0)->write("w:")->writeInt4(DEG(angleX), DEG(angleY), DEG(angleZ));
-//			display.setCursorPos(2, 0)->write("p:")->writeInt4(DEG(pidAngleX), DEG(pidAngleY), DEG(angleZ));
-//			display.setCursorPos(2, 0)->write("a:")->writeInt4(gyro.x() * 100, gyro.y() * 100, gyro.z() * 100);
-//			display.setCursorPos(0, 0)->write("gx:")->writeInt(gyro.x() * 100);
-//			display.setCursorPos(1, 0)->write("gy:")->writeInt(gyro.y() * 100);
-//			display.setCursorPos(2, 0)->write("gz:")->writeInt(gyro.z() * 100);
+#endif
+#if false	// Show sensors
+			display.setCursorPos(0, 0)->write("a:")->writeInt4(acc.x() * 100, acc.y() * 100, acc.z() * 100);
+			display.setCursorPos(1, 0)->write("g:")->writeInt4(gyro.x() * 100, gyro.y() * 100, gyro.z() * 100);
+			display.setCursorPos(2, 0)->write("w:")->writeInt4(DEG(angleX), DEG(angleY), DEG(angleZ));
+			display.setCursorPos(3, 0)->write("p:")->writeInt4(DEG(pidAngleX), DEG(pidAngleY), DEG(angleZ));
+#endif
+#if false	// Show Gyro
+			display.setCursorPos(0, 0)->write("gx:")->writeInt(gyro.x() * 100);
+			display.setCursorPos(1, 0)->write("gy:")->writeInt(gyro.y() * 100);
+			display.setCursorPos(2, 0)->write("gz:")->writeInt(gyro.z() * 100);
+#endif
+#if true	// Show Time
 			display.setCursorPos(3, 0)->write("t:")->writeUint32(clock.milliSeconds);
-//			display.setCursorPos(2, 0)->write("r:")->writeInt4(remoteX, remoteY, remoteState);
+#endif
+#if true	// Show Remote
+			display.setCursorPos(2, 0)->write("r:")->writeInt4(remoteX, remoteY, remoteState);
+#endif
 #			endif
 
 #			ifdef BLUETOOTH
@@ -402,13 +427,7 @@ int main() {
 			}
 #			endif
 
-			if (DEBUG_Button()) {
-				speed = standby;
-#			ifndef REMOTE
-			} else {
-				speed = 0;
-#			endif
-			}
+			float yaw = 0.0;
 
 #			ifdef REMOTE
 			if (remote.getButton(Transmitter::btnFire)) {
@@ -436,7 +455,6 @@ int main() {
 				posZ = 0.0;
 				_delay_ms(200);
 			}
-
 			if (remote.getButton(Transmitter::curUp)) {
 				//standby += 0.001;
 				i += 0.0001;
@@ -445,7 +463,7 @@ int main() {
 				//standby -= 0.001;
 				i -= 0.0001;
 			}
-			float yaw = 0.0;
+
 			if (remote.getButton(Transmitter::curLeft)) {
 				//yaw = 0.01;
 				p -= 0.0001;
@@ -458,22 +476,49 @@ int main() {
 			pidY.setPID(p, i, d);
 #			endif
 
+			if (DEBUG_Button()) {
+				speed = standby;
+#			ifndef REMOTE
+			} else {
+				speed = 0;
+#			endif
+			}
+
+#			ifdef MOTOR
 			motor.setSpeed(speed - pwmY + yaw,
 					       speed + pwmY - yaw,
 					       speed + pwmX + yaw,
 					       speed - pwmX - yaw);
-
+#			endif
 			clock.eventInterrupt = false;
 
 			// Debug LED aus
 			DEBUG_LED(0);
-		}
 
-#		ifdef DISPLAY
-		//display.setCursorPos(3, 0)->write("standby: ")->writeFloat(standby);
-		//display.setCursorPos(3, 0)->write("m1:")->writeInt4(motor.getSpeedI(1))->write("%");
-		//display.setCursorPos(3, 0)->write("m3:")->writeInt4(motor.getSpeedI(3))->write("%");
-#		endif
+	#		ifdef DISPLAY
+//			display.setCursorPos(2, 0)->write("speed: ")->writeFloat(speed);
+			display.setCursorPos(0, 0)->write("m1:")->writeInt4(motor.getSpeedI(1))->write("%");
+			display.setCursorPos(1, 0)->write("m3:")->writeInt4(motor.getSpeedI(3))->write("%");
+	#		endif
+		}
+	}
+}
+#endif
+
+#ifdef DEBUG_DEBUG
+int main() {
+	set32MHz();
+	_delay_ms(10);
+
+	// Für LED und Taster.
+	DEBUG_init();
+
+	while (true) {
+		if (DEBUG_Button()) {
+			DEBUG_LED(1);
+		} else {
+			DEBUG_LED(0);
+		}
 	}
 }
 #endif
@@ -625,7 +670,6 @@ int main() {
 #ifdef DEBUG_RF
 int main() {
 	set32MHz();
-	useInterruptPriorities();
 	_delay_ms(500);
 
 	DEBUG_init();
@@ -634,7 +678,7 @@ int main() {
 	//Display display(PORT_FROM_NUMBER(2));
 	display.init();
 	_delay_ms(100);
-	display.write(0, 0, "Starting...");
+	display.setCursorPos(0, 0)->write("Starting...");
 
 	cli();
 	activateInterrupts();
@@ -642,7 +686,7 @@ int main() {
 	Transmitter remote;
 
 	if (remote.getConfigStatus() != 0) {
-		display.write(1, 0, "RF Error: ")->writeUint(remote.getConfigStatus());
+		display.setCursorPos(1, 0)->write("RF Error: ")->writeUint(remote.getConfigStatus());
 		while (1);
 	}
 
@@ -656,10 +700,10 @@ int main() {
 
 		remote.getState(axisX, axisY, buttonState, buttonPushed);
 
-		display.write(0, 0, "X-Axis: ")->writeInt(axisX)->write("  ");
-		display.write(1, 0, "Y-Axis: ")->writeInt(axisY)->write("  ");
-		display.write(2, 0, " state: ")->writeInt(buttonState)->write("  ");
-		display.write(3, 0, "pushed: ")->writeInt(buttonPushed)->write("  ");
+		display.setCursorPos(0, 0)->write("X-Axis: ")->writeInt(axisX)->write("  ");
+		display.setCursorPos(1, 0)->write("Y-Axis: ")->writeInt(axisY)->write("  ");
+		display.setCursorPos(2, 0)->write(" state: ")->writeInt(buttonState)->write("  ");
+		display.setCursorPos(3, 0)->write("pushed: ")->writeInt(buttonPushed)->write("  ");
 		i++;
 
 		_delay_ms(10);

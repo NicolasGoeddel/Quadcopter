@@ -9,7 +9,7 @@
 
 #include "DEBUG.h"
 
-Bluetooth::Bluetooth(USART_t* usart, PORT_t* port, uint32_t baud) : USART(usart, port, true) {
+Bluetooth::Bluetooth(USART_t* usart, PORT_t* port, uint32_t baud) : USART(usart, port, false) {
 	setBaudrate(baud);
 }
 

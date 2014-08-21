@@ -12,7 +12,7 @@
 #include "StringDevice.h"
 #include "RingBuffer.h"
 
-class USART : public StringDevice<USART> {
+class USART : Interrupt, public StringDevice<USART> {
 	private:
 		USART_t* usart;
 		PORT_t* port;
@@ -20,6 +20,7 @@ class USART : public StringDevice<USART> {
 		uint32_t cpuFreq;
 		bool useDMA;
 		RingBufferOutDMA<uint8_t>* rb;
+		RingBufferInDMA<uint8_t>* rb_in;
 
 	public:
 		USART(USART_t* usart, PORT_t* port, bool useDMA = false) {
@@ -28,20 +29,29 @@ class USART : public StringDevice<USART> {
 			cpuFreq = F_CPU;
 			init(9600);
 			if (useDMA) {
-				register8_t triggerSource = getTriggerSource(usart);
+				register8_t triggerSource = getTriggerSourceDRE(usart);
 
 				if (triggerSource == 0) {
 					this->useDMA = false;
 				} else {
 					this->useDMA = true;
-					rb = new RingBufferOutDMA<uint8_t>(100, 0, (uint8_t*) &usart->DATA, triggerSource);
+					rb = new RingBufferOutDMA<uint8_t>(100, &DMA.CH0, (uint8_t*) &usart->DATA, triggerSource);
 				}
+
+//				triggerSource = getTriggerSourceRXC(usart);
+//				if (triggerSource == 0) {
+//					this->useDMA = false;
+//				} else {
+//					this->useDMA = true;
+//					rb_in = new RingBufferInDMA<uint8_t>(100, 4, &DMA.CH1, (uint8_t*) &usart->DATA, triggerSource);
+//				}
 			} else {
 				this->useDMA = false;
 			}
 		}
 
-		static register8_t getTriggerSource(USART_t* usart);
+		static register8_t getTriggerSourceDRE(USART_t* usart);
+		static register8_t getTriggerSourceRXC(USART_t* usart);
 
 		~USART() {
 		}

@@ -101,10 +101,9 @@ class Motor {
 		}
 
 		void setSpeed(float m1, float m2, float m3, float m4) {
-			//FIXME
-			DC[0] = zeroDC;// + diffDC * cutBorders(m1);
+			DC[0] = zeroDC + diffDC * cutBorders(m1);
 			DC[1] = zeroDC + diffDC * cutBorders(m2);
-			DC[2] = zeroDC;// + diffDC * cutBorders(m3);
+			DC[2] = zeroDC + diffDC * cutBorders(m3);
 			DC[3] = zeroDC + diffDC * cutBorders(m4);
 			setPWM();
 		}

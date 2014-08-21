@@ -61,31 +61,59 @@ bool USART::init(uint32_t baudRate) {
 	return setBaudrate(baudRate);
 }
 
-#define GET_TRIGGER_SOURCE(name) if (usart == &name) return DMA_CH_TRIGSRC_##name##_DRE_gc;
-register8_t USART::getTriggerSource(USART_t* usart) {
+
+#define GET_TRIGGER_SOURCE(name, dir) if (usart == &name) return DMA_CH_TRIGSRC_##name##_##dir##_gc;
+register8_t USART::getTriggerSourceDRE(USART_t* usart) {
 #	ifdef USARTC0
-	GET_TRIGGER_SOURCE(USARTC0)
+	GET_TRIGGER_SOURCE(USARTC0, DRE)
 #	endif
 #	ifdef USARTC1
-	GET_TRIGGER_SOURCE(USARTC1)
+	GET_TRIGGER_SOURCE(USARTC1, DRE)
 #	endif
 #	ifdef USARTD0
-	GET_TRIGGER_SOURCE(USARTD0)
+	GET_TRIGGER_SOURCE(USARTD0, DRE)
 #	endif
 #	ifdef USARTD1
-	GET_TRIGGER_SOURCE(USARTD1)
+	GET_TRIGGER_SOURCE(USARTD1, DRE)
 #	endif
 #	ifdef USARTE0
-	GET_TRIGGER_SOURCE(USARTE0)
+	GET_TRIGGER_SOURCE(USARTE0, DRE)
 #	endif
 #	ifdef USARTE1
-	GET_TRIGGER_SOURCE(USARTE1)
+	GET_TRIGGER_SOURCE(USARTE1, DRE)
 #	endif
 #	ifdef USARTF0
-	GET_TRIGGER_SOURCE(USARTF0)
+	GET_TRIGGER_SOURCE(USARTF0, DRE)
 #	endif
 #	ifdef USARTF1
-	GET_TRIGGER_SOURCE(USARTF1)
+	GET_TRIGGER_SOURCE(USARTF1, DRE)
+#	endif
+	return 0;
+}
+register8_t USART::getTriggerSourceRXC(USART_t* usart) {
+#	ifdef USARTC0
+	GET_TRIGGER_SOURCE(USARTC0, RXC)
+#	endif
+#	ifdef USARTC1
+	GET_TRIGGER_SOURCE(USARTC1, RXC)
+#	endif
+#	ifdef USARTD0
+	GET_TRIGGER_SOURCE(USARTD0, RXC)
+#	endif
+#	ifdef USARTD1
+	GET_TRIGGER_SOURCE(USARTD1, RXC)
+#	endif
+#	ifdef USARTE0
+	GET_TRIGGER_SOURCE(USARTE0, RXC)
+#	endif
+#	ifdef USARTE1
+	GET_TRIGGER_SOURCE(USARTE1, RXC)
+#	endif
+#	ifdef USARTF0
+	GET_TRIGGER_SOURCE(USARTF0, RXC)
+#	endif
+#	ifdef USARTF1
+	GET_TRIGGER_SOURCE(USARTF1, RXC)
 #	endif
 	return 0;
 }
