@@ -28,6 +28,7 @@ class Transmitter {
 		uint8_t values[4];
 		uint8_t configStatus;
 		uint8_t getsWithoutNewData;
+		uint8_t lastState;
 
 	public:
 		enum ButtonName {
@@ -54,6 +55,7 @@ class Transmitter {
 
 			//wl_module_rx_config();
 			values[0] = values[1] = values[2] = values[3] = 0;
+			lastState = 0;
 		};
 		~Transmitter() {};
 
@@ -62,10 +64,13 @@ class Transmitter {
 		}
 
 		void addPayload(uint8_t* payload) {
-			for (uint8_t i = 0; i < 4; i++) {
-				values[i] = payload[i];
-			}
+			values[0] = payload[0];
+			values[1] = payload[1];
+			values[2] = payload[2];
+			uint8_t curPushed = (values[2] ^ lastState) & values[2] & 0xf0;
+			values[3] |= (payload[3] | curPushed);
 			getsWithoutNewData = 0;
+			lastState = values[2];
 		}
 
 		void newGet() {
@@ -76,6 +81,16 @@ class Transmitter {
 			}
 		}
 
+		/**
+		 * Gibt den aktuellen Status der Fernbedienung zurück
+		 *
+		 * @param axisX			Bewegung auf der X-Achse.
+		 * @param axisY			Bewegung auf der Y-Achse.
+		 * @param buttonState	Aktueller Status der Buttons.
+		 * @param buttonPushed	Wenn ein Button in der letzten Zeit gedrückt wurde,
+		 *                      wird das entsprechende Bit auf 1 gesetzt. Das Bit kann
+		 *                      mit wasButtonPushed() zurück gesetzt werden.
+		 */
 		void getState(uint8_t & axisX, uint8_t & axisY, uint8_t & buttonState, uint8_t & buttonPushed) {
 			//newGet();
 			axisX = values[0];
@@ -88,6 +103,14 @@ class Transmitter {
 			//newGet();
 			if (values[2] & _BV(button))
 				return true;
+			return false;
+		}
+
+		bool wasButtonPushed(ButtonName button) {
+			if (values[3] & _BV(button)) {
+				values[3] &= ~(_BV(button));
+				return true;
+			}
 			return false;
 		}
 };

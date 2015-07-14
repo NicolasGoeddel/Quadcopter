@@ -39,7 +39,7 @@
 #include "math.h"
 
 /**
- * Auf 1 setzen, wenn die alte Implementierung benutzt werden soll.
+ * Auf true setzen, wenn die alte Implementierung benutzt werden soll.
  */
 #define USE_OLD_IMPLEMENTATION false
 
@@ -54,6 +54,7 @@ class PID {
 		float iGain;	// Integral gain
 		float pGain;	// Proportional gain
 		float dGain;	// Derivative gain
+		float lastError;
 		float dT;
 	public:
 		PID(float p, float i, float d, float dT) {
@@ -82,22 +83,16 @@ class PID {
 		}
 
 		void getPID(float* p, float* i, float* d) {
-			if (p)
-				*p = pGain;
-			if (i) {
-				*i = iGain;
-				iState = 0.0;
-			}
-			if (d)
-				*d = dGain;
+			if (p)	*p = pGain;
+			if (i)	*i = iGain;
+			if (d)	*d = dGain;
 		}
 
 		float operator()(float error) {
-			// calculate the integral state with approriate limiting
-			//iState = 0.0;
+			// calculate the integral state with appropriate limiting
 			// only accumulate error while in band
 			if (fabs(error) < iBand) {
-				iState += error;
+				iState += error * dT;
 			}
 			// limit accumulator to bounds iMax, iMin
 			if (iState > iMax) {
@@ -107,7 +102,9 @@ class PID {
 			}
 			// calculate the integral term
 			float iTerm = iGain * iState;
-			return (pGain * error) + iTerm - (dGain * dT);
+			float dTerm = (error - lastError) * dGain / dT;
+			lastError = error;
+			return (pGain * error) + iTerm + dTerm;
 		}
 		float operator()(float target, float current) {
 			return (*this)(target - current);

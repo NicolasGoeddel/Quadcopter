@@ -189,7 +189,7 @@ class Display : public StringDevice<Display> {
 			// CH - Clear Cursor of DD RAM display data home & display start address home
 			send(0, LCD_CMD_CLEARCURSORDATAADDRHOME);
 
-			_delay_ms(10);
+			_delay_ms(100);
 		}
 
 		Display* setCursorPos(uint8_t row, uint8_t column) {

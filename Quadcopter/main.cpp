@@ -182,12 +182,14 @@ int main() {
 	DEBUG_init();
 
 	// Display initialisieren
+#	ifdef DISPLAY
 	Display display(PORTC);
 	display.init();
 	_delay_ms(50);
 
 	display.clear();
 	_delay_ms(100);
+#	endif
 
 #	ifdef MOTOR
 	/* 0.1 ist der Dutycycle für die Motorcontroller,
@@ -196,9 +198,13 @@ int main() {
 	 * Vollgas laufen sollen.
 	 */
 	Motor motor(PORTD, TCD0, 0.1, 0.20);
+#		ifdef DISPLAY
 	display.setCursorPos(0, 0)->write("PWM max=")->writeUint(motor.getMaxDC());
+#		endif
 #	else
+#		ifdef DISPLAY
 	display.setCursorPos(0, 0)->write("Motor off!")->writeUint(motor.getMaxDC());
+#		endif
 #	endif
 
 	//Aktiviere die Interrupts
@@ -210,63 +216,87 @@ int main() {
 	//template <uint8_t CS, uint8_t MOSI, uint8_t MISO, uint8_t SCLK>
 	ADXL345<4, 5, 6, 7> acc(PORTE);
 	if (!acc.isDeviceOk()) {
+#		ifdef DISPLAY
 		display.setCursorPos(errorLine++, 0)->write("ACC ERROR!");
+#		endif
 	} else {
 		acc.setDefaults();
 		if (!acc.calibrate()) {
+#			ifdef DISPLAY
 			display.setCursorPos(1, 0)->write("ACC CAL WARN!");
+#			endif
 		} else {
+#			ifdef DISPLAY
 			//display.write(1, 0, "ACC:")->writeInt(acc.getOffset32(0))->write(",")->writeInt(acc.getOffset32(1))->write(",")->writeInt(acc.getOffset32(2));
 			display.setCursorPos(1, 0)->write("ACC:")->writeInt(acc.getOffset(0))->write(",")->writeInt(acc.getOffset(1))->write(",")->writeInt(acc.getOffset(2));
+#			endif
 		}
-		acc.setSmooth(10);
+		acc.setSmooth(5);
 	}
 
 	// Initialisiere Gyro
 	L3G4200D<2, 1, 0, 3> gyro(PORTE);
 	if (!gyro.isDeviceOk()) {
+#		ifdef DISPLAY
 		display.setCursorPos(errorLine++, 0)->write("GYRO ERROR!");
+#		endif
 	} else {
 		gyro.setDefaults();
 		gyro.calibrate();
 		gyro.setSmooth(3);
+#		ifdef DISPLAY
 		display.setCursorPos(2, 0)->write("GYRO ok.");
+#		endif
 	}
 
 #	ifdef REMOTE
 	// Initialisiere die Fernbedienung
 	Transmitter remote;
+#		ifdef DISPLAY
 	if (remote.getConfigStatus() != 0) {
 		display.setCursorPos(errorLine++, 0)->write("RF Error: ")->writeUint(remote.getConfigStatus());
 	} else {
 		display.setCursorPos(3, 0)->write("Remote ok.");
 	}
+#		endif
 #	else
+#		ifdef DISPLAY
 	display.setCursorPos(3, 0)->write("Remote off!");
+#		endif
 #	endif
 
 #	ifdef BLUETOOTH
 	// Initialisiere Bluetooth Debugger
 	Bluetooth bt(&USARTD1, &PORTD, 9600);
 	if (!bt.isDeviceOk()) {
+#		ifdef DISPLAY
 		display.setCursorPos(errorLine++, 0)->write("BLUETOOTH ERROR!");
+#		endif
 	} else {
+#		ifdef DISPLAY
 		display.setCursorPos(0, 0)->write("Bluetooth ok.");
+#		endif
 	}
 #	else
+#		ifdef DISPLAY
 	display.setCursorPos(0, 0)->write("Bluetooth off!");
+#		endif
 #	endif
 
 	// Wenn ein Fehler aufgetreten ist, beende das Programm, damit man die Fehlermeldung sehen kann.
 	if (errorLine > 0) {
+#		ifdef DISPLAY
 		display.setCursorPos(3, 0)->write("STOPPING DEVICE!");
+#		endif
 		while (true);
 	} else {
+#		ifdef DISPLAY
 		_delay_ms(500);
 		display.clear();
 		display.setCursorPos(0, 0)->write("Calibrating done");
 		_delay_ms(1000);
 		display.clear();
+#		endif
 	}
 
 	// END INITIALISATION
@@ -285,12 +315,12 @@ int main() {
 	#define MAX_ANGLE_RAD (MAX_ANGLE_DEG * 0.017453293)
 
 	// Einstellung für die PID-Regler
-	#define PID_P 0.072
-	#define PID_I 0.12
-	#define PID_D 0.0108 //0.0024
-	#define PID_I_Min -0.01
-	#define PID_I_Max 0.01
-	#define PID_I_Band 0.2
+	#define PID_P 0.0
+	#define PID_I 0.0
+	#define PID_D 0.0 //0.0024
+	#define PID_I_Min -1.0
+	#define PID_I_Max 1.0
+	#define PID_I_Band 1.0
 	#define PID_Scale 1.0 //0.06
 
 	PID pidX(PID_P * PID_Scale, PID_I * PID_Scale, PID_D * PID_Scale, dT);
@@ -302,8 +332,22 @@ int main() {
 	CFilter filterX(0.045, dT);
 	CFilter filterY(0.045, dT);
 
-	float angleX, angleY, angleZ = 0.0;
-	float pidAngleX, pidAngleY;
+	struct Vector2f {
+			Vector2f() {
+				x = y = 0.0f;
+			}
+			float x, y;
+	};
+
+	struct Vector3f {
+			Vector3f() {
+				x = y = z = 0.0f;
+			}
+			float x, y, z;
+	};
+
+	Vector3f angle;
+	Vector3f pidAngle;
 	float accZ = 0.0;
 	float speedZ = 0.0;
 	float posZ = 0.0;
@@ -313,6 +357,18 @@ int main() {
 
 	DEBUG_LED(1);
 	Clock clock;
+
+	enum {
+		DISPLAY_MOTORS = 0,
+		DISPLAY_P,
+		DISPLAY_I,
+		DISPLAY_D,
+		DISPLAY_SENSORS,
+		DISPLAY_GYRO,
+		DISPLAY_LAST
+	};
+
+	uint8_t displayState = DISPLAY_MOTORS;
 
 	for (;;) {
 		if (clock.eventInterrupt) {
@@ -330,10 +386,10 @@ int main() {
 			speedZ *= 0.98;
 
 			// Winkel aus Beschleunigung und Gyro berechnen
-			angleX = filterX(acc.angleX(), gyro.x());
-			angleY = filterY(acc.angleY(), gyro.y());
-			if (gyro.z() > 10) {
-				angleZ += gyro.z() * dT;
+			angle.x = filterX(acc.angleX(), gyro.x());
+			angle.y = filterY(acc.angleY(), gyro.y());
+			if (fabs(gyro.z()) > 10.0f) {
+				angle.z += gyro.z() * dT;
 			}
 
 			// Fernbedienung auslesen
@@ -348,59 +404,88 @@ int main() {
 #			endif
 
 			// X-Y-Werte auf -1..1 normalisieren
-			float rX = (remoteX - 128) / 128.0;
-			float rY = (remoteY - 128) / 128.0;
+			Vector2f rc;
+			rc.x = (float) (remoteX - 128) / 128.0;
+			rc.y = (float) (remoteY - 128) / 128.0;
 
 			/* Linearität der X-Y-Werte aufheben: f(x) = (x^3 + x/2) / 1.5
 			 * Das macht kleine Auslenkungen genau und größere stärker.
 			 */
-			//rX = rX * (rX * rX + 0.5) * 0.666666;
-			//rY = rY * (rY * rY + 0.5) * 0.666666;
+			//rc.x = rc.x * (rc.x * rc.x + 0.5) * 0.666666;
+			//rc.y = rc.y * (rc.y * rc.y + 0.5) * 0.666666;
 
 			// X-Y-Werte auf MAX_ANGLE_RAD strecken
-			rX *= MAX_ANGLE_RAD;
-			rY *= MAX_ANGLE_RAD;
+			rc.x *= MAX_ANGLE_RAD;
+			rc.y *= MAX_ANGLE_RAD;
 
 			// Korrekturwinkel berechnen mit PID-Regler
-			pidAngleX = pidX(rX, angleX);
-			pidAngleY = pidY(rY, angleY);
+			pidAngle.x = pidX(rc.x, angle.x);
+			pidAngle.y = pidY(rc.y, angle.y);
 
-			float pwmX = pidAngleX * 1.0; // * PID_Scale;
-			float pwmY = pidAngleY * 1.0; // * PID_Scale;
+			Vector3f pwm;
+			pwm.x = pidAngle.x * 10.0; // * PID_Scale;
+			pwm.y = pidAngle.y * 10.0; // * PID_Scale;
+			pwm.z = 0.0;				// YAW
 
 			// Debug-Infos ausgeben
-#			ifdef DISPLAY
 			float p, i, d;
 			pidX.getPID(&p, &i, &d);
-#if false	// Show PID
-			display.setCursorPos(0, 0)->write("p:")->writeFloat(p);
-			display.setCursorPos(1, 0)->write("i:")->writeFloat(i);
-			display.setCursorPos(2, 0)->write("d:")->writeFloat(d);
-#endif
-#if false	// Show sensors
-			display.setCursorPos(0, 0)->write("a:")->writeInt4(acc.x() * 100, acc.y() * 100, acc.z() * 100);
-			display.setCursorPos(1, 0)->write("g:")->writeInt4(gyro.x() * 100, gyro.y() * 100, gyro.z() * 100);
-			display.setCursorPos(2, 0)->write("w:")->writeInt4(DEG(angleX), DEG(angleY), DEG(angleZ));
-			display.setCursorPos(3, 0)->write("p:")->writeInt4(DEG(pidAngleX), DEG(pidAngleY), DEG(angleZ));
-#endif
-#if false	// Show Gyro
-			display.setCursorPos(0, 0)->write("gx:")->writeInt(gyro.x() * 100);
-			display.setCursorPos(1, 0)->write("gy:")->writeInt(gyro.y() * 100);
-			display.setCursorPos(2, 0)->write("gz:")->writeInt(gyro.z() * 100);
-#endif
-#if true	// Show Time
-			display.setCursorPos(3, 0)->write("t:")->writeUint32(clock.milliSeconds);
-#endif
-#if true	// Show Remote
-			display.setCursorPos(2, 0)->write("r:")->writeInt4(remoteX, remoteY, remoteState);
-#endif
+
+#			ifdef DISPLAY
+			switch (displayState) {
+				case DISPLAY_P:
+				case DISPLAY_I:
+				case DISPLAY_D:
+					display.setCursorPos(0, 0);
+					if (displayState == DISPLAY_P) {
+						display.write("P:");
+					} else {
+						display.write("p:");
+					}
+					display.writeFloat(p);
+					display.setCursorPos(1, 0);
+					if (displayState == DISPLAY_I) {
+						display.write("I:");
+					} else {
+						display.write("i:");
+					}
+					display.writeFloat(i);
+					display.setCursorPos(2, 0);
+					if (displayState == DISPLAY_D) {
+						display.write("D:");
+					} else {
+						display.write("d:");
+					}
+					display.writeFloat(d);
+					display.setCursorPos(3, 0)->write("p:")->writeInt4(10 * DEG(pidAngle.x), 10 * DEG(pidAngle.y), DEG(angle.z));
+					break;
+				case DISPLAY_SENSORS:
+					display.setCursorPos(0, 0)->write("a:")->writeInt4(acc.x() * 100, acc.y() * 100, acc.z() * 100);
+					display.setCursorPos(1, 0)->write("g:")->writeInt4(gyro.x() * 100, gyro.y() * 100, gyro.z() * 100);
+					display.setCursorPos(2, 0)->write("w:")->writeInt4(DEG(angle.x), DEG(angle.y), DEG(angle.z));
+					display.setCursorPos(3, 0)->write("t:")->writeUint32(clock.milliSeconds);
+					break;
+				case DISPLAY_GYRO:
+					display.setCursorPos(0, 0)->write("gx:")->writeInt(gyro.x() * 100);
+					display.setCursorPos(1, 0)->write("gy:")->writeInt(gyro.y() * 100);
+					display.setCursorPos(2, 0)->write("gz:")->writeInt(gyro.z() * 100);
+					display.setCursorPos(3, 0)->write("t:")->writeUint32(clock.milliSeconds);
+					break;
+			}
+
 #			endif
 
-#			ifdef BLUETOOTH
+#			if defined(DISPLAY) && defined(REMOTE) && defined(BLUETOOTH)
 			if (remote.getButton(Transmitter::btnFire)) {
 				bt.write("Fire!\r\n");
 			}
-			if (DEBUG_Switch() || remote.getButton(Transmitter::btnTop)) {
+#			endif
+#			ifdef BLUETOOTH
+			if (DEBUG_Switch()
+#				ifdef DISPLAY
+					|| remote.getButton(Transmitter::btnTop)
+#				endif
+			) {
 //				bt.write("a:")->writeFloat(acc.x())->writeFloat(acc.y())->writeFloat(acc.z());
 //				bt.write(" g:")->writeFloat(gyro.x())->writeFloat(gyro.y())->writeFloat(gyro.z());
 //				bt.writeChar(13);
@@ -427,9 +512,24 @@ int main() {
 			}
 #			endif
 
-			float yaw = 0.0;
-
 #			ifdef REMOTE
+#				ifdef DISPLAY
+			if (remote.wasButtonPushed(Transmitter::curDown)) {
+				displayState++;
+				if (displayState == DISPLAY_LAST) {
+					displayState = 0;
+				}
+				display.clear();
+			}
+			if (remote.wasButtonPushed(Transmitter::curUp)) {
+				if (displayState == 0) {
+					displayState = DISPLAY_LAST;
+				}
+				displayState--;
+				display.clear();
+			}
+#				endif
+
 			if (remote.getButton(Transmitter::btnFire)) {
 				speed = standby;
 			} else {
@@ -455,22 +555,21 @@ int main() {
 				posZ = 0.0;
 				_delay_ms(200);
 			}
-			if (remote.getButton(Transmitter::curUp)) {
-				//standby += 0.001;
-				i += 0.0001;
-			}
-			if (remote.getButton(Transmitter::curDown)) {
-				//standby -= 0.001;
-				i -= 0.0001;
-			}
-
 			if (remote.getButton(Transmitter::curLeft)) {
 				//yaw = 0.01;
-				p -= 0.0001;
+				switch (displayState) {
+					case DISPLAY_P: p -= 0.0001; break;
+					case DISPLAY_I: i -= 0.0001; break;
+					case DISPLAY_D: d -= 0.0001; break;
+				}
 			}
 			if (remote.getButton(Transmitter::curRight)) {
 				//yaw = -0.01;
-				p += 0.0001;
+				switch (displayState) {
+					case DISPLAY_P: p += 0.0001; break;
+					case DISPLAY_I: i += 0.0001; break;
+					case DISPLAY_D: d += 0.0001; break;
+				}
 			}
 			pidX.setPID(p, i, d);
 			pidY.setPID(p, i, d);
@@ -485,21 +584,24 @@ int main() {
 			}
 
 #			ifdef MOTOR
-			motor.setSpeed(speed - pwmY + yaw,
-					       speed + pwmY - yaw,
-					       speed + pwmX + yaw,
-					       speed - pwmX - yaw);
+			motor.setSpeed(speed - pwm.y + pwm.z,
+						   speed + pwm.x - pwm.z,
+						   speed + pwm.y + pwm.z,
+					       speed - pwm.x - pwm.z);
 #			endif
 			clock.eventInterrupt = false;
 
 			// Debug LED aus
 			DEBUG_LED(0);
 
-	#		ifdef DISPLAY
-//			display.setCursorPos(2, 0)->write("speed: ")->writeFloat(speed);
-			display.setCursorPos(0, 0)->write("m1:")->writeInt4(motor.getSpeedI(1))->write("%");
-			display.setCursorPos(1, 0)->write("m3:")->writeInt4(motor.getSpeedI(3))->write("%");
-	#		endif
+			if (displayState == DISPLAY_MOTORS) {
+				display.setCursorPos(2, 0)->write("speed: ")->writeFloat(speed);
+				display.setCursorPos(0, 0)->write("mf:")->writeInt4(motor.getSpeedI(0))->write("%");
+				display.setCursorPos(0, 8)->write("ml:")->writeInt4(motor.getSpeedI(1))->write("%");
+				display.setCursorPos(1, 0)->write("mb:")->writeInt4(motor.getSpeedI(2))->write("%");
+				display.setCursorPos(1, 8)->write("mr:")->writeInt4(motor.getSpeedI(3))->write("%");
+				display.setCursorPos(3, 0)->write("r:")->writeInt4(DEG(rc.x), DEG(rc.y), remoteState);
+			}
 		}
 	}
 }

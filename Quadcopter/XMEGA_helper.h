@@ -45,7 +45,7 @@ DMA_CH_t* getFreeDMAChannel();
 void inline disableJTAG() {
 	CCP       = CCP_IOREG_gc;    // Secret handshake
 	MCU.MCUCR = 0b00000001;
-	NVM.FU????
+	//NVM.FU????
 }
 
 void inline activateInterrupts() {
