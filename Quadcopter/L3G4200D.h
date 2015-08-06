@@ -319,6 +319,16 @@ class L3G4200D {
 			}
 		}
 
+		void measureLowPass() {
+			int16_t values[3];
+
+			readXYZ(values);
+
+			for (uint8_t axis = 0; axis < 3; axis++) {
+				gyroRate[axis] = gyroRate[axis] + 0.4 * ((values[axis] - gyroZero[axis]) * gyroScaleFactor - gyroRate[axis]);
+			}
+		}
+
 		void measure() {
 			int16_t values[3];
 

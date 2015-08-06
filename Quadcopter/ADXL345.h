@@ -506,6 +506,13 @@ class ADXL345 {
 			return -myAtan2(meterPerSecSec[1], meterPerSecSec[0]);
 		}
 
+		float inline angleCosXY() {
+			float x = angleX();
+			float y = angleY();
+			float a = x * x + y * y;
+			return 1.0 - a * (0.5 + 0.041666 * a); // Series expansion for sqrt(cos(a))
+		}
+
 		/**
 		 * Stellt die Standardeinstellungen für den ADXL345 ein. Diese
 		 * Funktion kann man je nach Projekt anpassen, wenn man will.
@@ -551,6 +558,28 @@ class ADXL345 {
 				meterPerSecSec[axis] = smoothValues[axis](values[axis]) * scaleFactor;
 #else
 				meterPerSecSec[axis] = smoothValues[axis](values[axis] - offset[axis]) * scaleFactor;
+#endif
+			}
+		}
+
+		/**
+		 * Berechnet einen LowPass-Filter über die gemessenen Werte.
+		 * Die Werte können dann mit den entsprechenden Gettern
+		 * ausgelesen werden.
+		 * Siehe auch: https://en.wikipedia.org/wiki/Low-pass_filter#Simple_infinite_impulse_response_filter
+		 */
+		void measureLowPass() {
+			int16_t values[3];
+
+			readXYZ(values);
+
+			for (uint8_t axis = 0; axis < 3; axis++) {
+#if USE_OFFSET
+				meterPerSecSec[axis] = meterPerSecSec[axis] + 0.25 * (values[axis] * scaleFactor - meterPerSecSec[axis]);
+#else
+				meterPerSecSec[axis] = meterPerSecSec[axis] + 0.25 * ((values[axis]  - offset[axis]) * scaleFactor - meterPerSecSec[axis]);
+				// Keine Ahnung, ob diese Zeile vielleicht auch schneller ist
+				//meterPerSecSec[axis] = 0.25 * (values[axis]  - offset[axis]) * scaleFactor + 0.75 * meterPerSecSec[axis];
 #endif
 			}
 		}

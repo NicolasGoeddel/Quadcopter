@@ -34,6 +34,7 @@
 
 #include "myMath.h"
 #include <errno.h>
+#include <math.h>
 
 // Alternate method to calculate arctangent from: http://www.dspguru.com/comp.dsp/tricks/alg/fxdatan2.htm
 /*

@@ -14,6 +14,8 @@
 #include <avr/interrupt.h>
 #include <util/delay.h>
 #include "rf.h"
+#include "DEBUG.h"
+
 
 #define TRANS_MAGICNUMBER 0xAA
 
@@ -29,6 +31,10 @@ class Transmitter {
 		uint8_t configStatus;
 		uint8_t getsWithoutNewData;
 		uint8_t lastState;
+		enum {
+			THRESHOLD_NO_DATA = 30,  // max value = 255
+			THRESHOLD_REINIT = 90 // max value = 254
+		};
 
 	public:
 		enum ButtonName {
@@ -43,26 +49,50 @@ class Transmitter {
 		};
 		Transmitter() {
 			transmitter = this;
-			getsWithoutNewData = 0;
+
 			rf_setCallback(&ReceiverCallback);
 
 			wl_module_init();
 			_delay_ms(50);
+
+			init();
+		};
+		~Transmitter() {};
+
+		void init() {
+			getsWithoutNewData = 0;
+
+			wl_module_power_down();
+			_delay_ms(50);
+
 			wl_module_config();
 			configStatus = wl_module_config_verify();
 
 			//wl_module_tx_config(wl_module_TX_NR_1);
 
 			//wl_module_rx_config();
-			values[0] = values[1] = values[2] = values[3] = 0;
+			values[0] = values[1] = 128;
+			values[2] = values[3] = 0;
 			lastState = 0;
-		};
-		~Transmitter() {};
+		}
 
 		uint8_t getConfigStatus() {
 			return configStatus;
 		}
 
+		bool isConnected() {
+			if (getsWithoutNewData >= THRESHOLD_NO_DATA) {
+				return false;
+			}
+			return true;
+		}
+
+		/**
+		 * Wird von ReceiverCallback aufgerufen und erhält
+		 * die Daten, die die Fernbedienung gesendet hat.
+		 *
+		 * @param payload Die Rohdaten aus der Fernbedienung.
+		 */
 		void addPayload(uint8_t* payload) {
 			values[0] = payload[0];
 			values[1] = payload[1];
@@ -71,12 +101,25 @@ class Transmitter {
 			values[3] |= (payload[3] | curPushed);
 			getsWithoutNewData = 0;
 			lastState = values[2];
+			DEBUG_LED(2);
 		}
 
+		/**
+		 * Sollte einmal pro Get aufgerufen werden. Wird die
+		 * Funktion 30 mal aufgerufen, ohne dass bisher neue
+		 * Daten empfangen wurden, werden alle Daten zurück
+		 * gesetzt.
+		 */
 		void newGet() {
-			if (getsWithoutNewData == 30) {
-				//values[0] = values[1] = values[2] = values[3] = 0;
-			} else {
+			if (getsWithoutNewData >= THRESHOLD_NO_DATA) {
+				//TODO Funktioniert das hier auch richtig?
+				values[0] = values[1] = 128;
+				values[2] = values[3] = 0;
+			}
+//			if (getsWithoutNewData == THRESHOLD_REINIT) {
+//				init();
+//			}
+			if (getsWithoutNewData < 254) {
 				getsWithoutNewData++;
 			}
 		}
@@ -92,13 +135,20 @@ class Transmitter {
 		 *                      mit wasButtonPushed() zurück gesetzt werden.
 		 */
 		void getState(uint8_t & axisX, uint8_t & axisY, uint8_t & buttonState, uint8_t & buttonPushed) {
-			//newGet();
+			newGet();
 			axisX = values[0];
 			axisY = values[1];
 			buttonState = values[2];
 			buttonPushed = values[3];
 		}
 
+		/**
+		 * Gibt den Status des entsprechenden Buttons zurück.
+		 *
+		 * @param button Der zu überprüfende Button.
+		 * @return       true, wenn der Button gerade gedrückt wird,
+		 *               sonst false.
+		 */
 		bool getButton(ButtonName button) {
 			//newGet();
 			if (values[2] & _BV(button))
@@ -106,6 +156,14 @@ class Transmitter {
 			return false;
 		}
 
+		/**
+		 * Gibt zurück, ob der entsprechende Button seit dem
+		 * letzten Mal zumindest einmal gedrückt wurde.
+		 *
+		 * @param button Der zu überprüfende Button.
+		 * @return       true, wenn der Button gerdrückt wurden,
+		 *               sonst false.
+		 */
 		bool wasButtonPushed(ButtonName button) {
 			if (values[3] & _BV(button)) {
 				values[3] &= ~(_BV(button));

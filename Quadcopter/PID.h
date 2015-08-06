@@ -65,6 +65,7 @@ class PID {
 			iMax = 1.0;
 			iMin = -1.0;
 			iBand = 2.0;
+			lastError = 0.0;
 			this->dT = dT;
 		}
 		~PID() {};
@@ -77,15 +78,39 @@ class PID {
 		}
 
 		void setPID(float p, float i, float d) {
-			iGain = i;
-			pGain = p;
-			dGain = d;
+			if (p != NAN) pGain = p;
+			if (i != NAN) iGain = i;
+			if (d != NAN) dGain = d;
 		}
 
 		void getPID(float* p, float* i, float* d) {
 			if (p)	*p = pGain;
 			if (i)	*i = iGain;
 			if (d)	*d = dGain;
+		}
+
+		void inline addP(float pDelta) {
+			pGain += pDelta;
+		}
+
+		void inline addI(float iDelta) {
+			iGain += iDelta;
+		}
+
+		void inline addD(float dDelta) {
+			dGain += dDelta;
+		}
+
+		float inline getP() {
+			return pGain;
+		}
+
+		float inline getI() {
+			return iGain;
+		}
+
+		float inline getD() {
+			return dGain;
 		}
 
 		float operator()(float error) {
@@ -101,10 +126,9 @@ class PID {
 				iState = iMin;
 			}
 			// calculate the integral term
-			float iTerm = iGain * iState;
-			float dTerm = (error - lastError) * dGain / dT;
+			float dTerm = (error - lastError) / dT;
 			lastError = error;
-			return (pGain * error) + iTerm + dTerm;
+			return (pGain * error) + iGain * iState + dGain * dTerm;
 		}
 		float operator()(float target, float current) {
 			return (*this)(target - current);
