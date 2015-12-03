@@ -1,4 +1,4 @@
-Quadcopter/Release
 *.o
 *.d
 *.mk
+/Release/
