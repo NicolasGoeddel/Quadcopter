@@ -167,7 +167,7 @@ float myAtan2(float y, float x) {
 }
 
 float Myatof(char * value) {
-	float f;
+	float f = 0.0;
 	// Skip all chars other to 0..9
 	while (*value) {
 		if ((*value >= '0' && *value <= '9') || *value == '.') break;

@@ -110,7 +110,7 @@ extern "C" void __cxa_pure_virtual() {
  *	D		6-7		31-32	Bluetooth-Adapter
  *	E		4-7		39-42	Beschleunigungssensor (SCLK, MOSI, MISO, CS)
  *	E		0-3		35-38	Gyrosensor
- *	F		3-7		48-32	nRF24L01+
+ *	F		2-7		47-52	nRF24L01+
  *	H		0-1				Debug-Taster
  *	H		2-3				Debug-LED
  *	H		4-5				Debug-Schalter für Bluetooth
@@ -198,6 +198,10 @@ int main() {
 	set32MHz();
 	_delay_ms(10);
 
+	//Aktiviere die Interrupts
+	//FIXME oh oh
+	activateInterrupts();
+
 	// Für LED und Taster.
 	DEBUG_init();
 
@@ -217,108 +221,150 @@ int main() {
 	 * 0.2 ist der Dutycycle, bei dem die Motoren auf
 	 * Vollgas laufen sollen.
 	 */
+	display.write("INIT Motor...");
 	Motor motor(PORTD, TCD0, 0.1, 0.20);
 #		ifdef DISPLAY
-	display.setCursorPos(0, 0)->write("PWM max=")->writeUint(motor.getMaxDC());
+	display.setCursorPos(1, 0)->write("Motors ok.")->writeUint(motor.getMaxDC());
+	display.setCursorPos(2, 0)->write("PWM max=")->writeUint(motor.getMaxDC());
 #		endif
 #	else
 #		ifdef DISPLAY
-	display.setCursorPos(0, 0)->write("Motor off!")->writeUint(motor.getMaxDC());
+	display.setCursorPos(0, 0)->write("Motors off!")->writeUint(motor.getMaxDC());
 #		endif
 #	endif
 
-	uint8_t errorLine = 0;
+	uint8_t errors = 0;
 
 	// Initialisiere Beschleunigungssensor
 	//template <uint8_t CS, uint8_t MOSI, uint8_t MISO, uint8_t SCLK>
+#	ifdef DISPLAY
+	_delay_ms(750);
+	display.clear();
+	_delay_ms(50);
+	display.write("INIT Acc...");
+#	endif
 	ADXL345<4, 5, 6, 7> acc(PORTE);
 	if (!acc.isDeviceOk()) {
 #		ifdef DISPLAY
-		display.setCursorPos(errorLine++, 0)->write("ACC ERROR!");
+		display.setCursorPos(1, 0)->write("Acc ERROR!");
+		_delay_ms(2000);
+		errors++;
 #		endif
 	} else {
 		acc.setDefaults();
 		if (!acc.calibrate()) {
 #			ifdef DISPLAY
-			display.setCursorPos(1, 0)->write("ACC CAL WARN!");
+			display.setCursorPos(1, 0)->write("Calib WARN!");
 #			endif
 		} else {
 #			ifdef DISPLAY
-			//display.write(1, 0, "ACC:")->writeInt(acc.getOffset32(0))->write(",")->writeInt(acc.getOffset32(1))->write(",")->writeInt(acc.getOffset32(2));
-			display.setCursorPos(1, 0)->write("ACC:")->writeInt(acc.getOffset(0))->write(",")->writeInt(acc.getOffset(1))->write(",")->writeInt(acc.getOffset(2));
+			display.setCursorPos(1, 0)->write("Acc ok.")->writeUint(motor.getMaxDC());
+			display.setCursorPos(2, 0)->write("OFF:")->writeInt(acc.getOffset(0))->write(",")->writeInt(acc.getOffset(1))->write(",")->writeInt(acc.getOffset(2));
 #			endif
 		}
 		acc.setSmooth(8);
 	}
 
 	// Initialisiere Gyro
+#	ifdef DISPLAY
+	_delay_ms(750);
+	display.clear();
+	_delay_ms(50);
+	display.write("INIT Gyro...");
+#	endif
 	L3G4200D<2, 1, 0, 3> gyro(PORTE);
 	if (!gyro.isDeviceOk()) {
 #		ifdef DISPLAY
-		display.setCursorPos(errorLine++, 0)->write("GYRO ERROR!");
+		display.setCursorPos(1, 0)->write("Gyro ERR!");
+		_delay_ms(2000);
+		errors++;
 #		endif
 	} else {
 		gyro.setDefaults();
 		gyro.calibrate();
 		gyro.setSmooth(3);
 #		ifdef DISPLAY
-		display.setCursorPos(2, 0)->write("GYRO ok.");
+		display.setCursorPos(1, 0)->write("Gyro ok.");
 #		endif
 	}
 
+#	ifdef DISPLAY
+	_delay_ms(750);
+	display.clear();
+	_delay_ms(50);
+#	endif
 #	ifdef REMOTE
 	// Initialisiere die Fernbedienung
+#		ifdef DISPLAY
+	display.write("INIT Remote...");
+#		endif
 	Transmitter remote;
 #		ifdef DISPLAY
 	if (remote.getConfigStatus() != 0) {
-		display.setCursorPos(errorLine++, 0)->write("RF Error: ")->writeUint(remote.getConfigStatus());
+		display.setCursorPos(1, 0)->write("Remote ERR (")->writeUint(remote.getConfigStatus())->write(")");
+		errors++;
+		_delay_ms(2000);
 	} else {
-		display.setCursorPos(3, 0)->write("Remote ok.");
+		display.setCursorPos(1, 0)->write("Remote ok.");
 	}
 #		endif
 #	else
 #		ifdef DISPLAY
-	display.setCursorPos(3, 0)->write("Remote off!");
+	display.setCursorPos(0, 0)->write("Remote off!");
 #		endif
+#	endif
+
+#	ifdef DISPLAY
+	_delay_ms(750);
+	display.clear();
+	_delay_ms(50);
 #	endif
 
 #	ifdef BLUETOOTH
 	// Initialisiere Bluetooth Debugger
+#		ifdef DISPLAY
+	display.write("INIT BT...");
+#		endif
 	Bluetooth bt(&USARTD1, &PORTD, 9600);
 	if (!bt.isDeviceOk()) {
 #		ifdef DISPLAY
-		display.setCursorPos(errorLine++, 0)->write("BLUETOOTH ERROR!");
+		display.setCursorPos(1, 0)->write("BT ERROR!");
+		_delay_ms(2000);
+		errors++;
 #		endif
 	} else {
 #		ifdef DISPLAY
-		display.setCursorPos(0, 0)->write("Bluetooth ok.");
+		display.setCursorPos(1, 0)->write("BT ok.");
 #		endif
 	}
 #	else
 #		ifdef DISPLAY
-	display.setCursorPos(0, 0)->write("Bluetooth off!");
+	display.setCursorPos(0, 0)->write("BT off!");
 #		endif
 #	endif
 
-	// Wenn ein Fehler aufgetreten ist, beende das Programm, damit man die Fehlermeldung sehen kann.
-	if (errorLine > 0) {
 #		ifdef DISPLAY
+	_delay_ms(750);
+	display.clear();
+	_delay_ms(50);
+	display.write("Status");
+#		endif
+
+	// Wenn ein Fehler aufgetreten ist, beende das Programm, damit man die Fehlermeldung sehen kann.
+	if (errors > 0) {
+#		ifdef DISPLAY
+		display.setCursorPos(1, 0)->write("Errors: ")->writeUint(errors);
 		display.setCursorPos(3, 0)->write("STOPPING DEVICE!");
 #		endif
 		while (true);
 	} else {
 #		ifdef DISPLAY
-		_delay_ms(500);
-		display.clear();
-		display.setCursorPos(0, 0)->write("Done.");
+		display.setCursorPos(1, 0)->write("Ok.");
+		display.setCursorPos(2, 0)->write("Waiting 1 s...");
 		_delay_ms(1000);
 		display.clear();
 #		endif
 	}
-
-	//Aktiviere die Interrupts
-	//FIXME oh oh
-	activateInterrupts();
 
 	// END INITIALISATION
 
@@ -552,16 +598,19 @@ int main() {
 			}
 
 			// Fernbedienung auslesen
-			uint8_t remoteX, remoteY, remoteState, remotePushed;
-			remote.getState(remoteX, remoteY, remoteState, remotePushed);
+			uint8_t remoteX, remoteY, remoteThrottle, remoteState, remotePushed;
+			remote.getState(remoteX, remoteY, remoteThrottle, remoteState, remotePushed);
 
-			// Wenn der Top-Button gedrückt wird, kann man hoch/runter regeln und sich um die eigene Achse drehen
+			float remoteSpeed = (float) remoteThrottle / 255.0;
+			speed = remoteSpeed;
+
+			// Wenn der Top-Button gedrückt wird, kann sich um die eigene Achse drehen
 			if (remote.getButton(Transmitter::btnTop)) {
 				remoteAngle.x = 0;
 				remoteAngle.y = 0;
 
-				float remoteSpeed = (float) (remoteY - 128) / 128.0;
-				standby += 0.075 * remoteSpeed * dT;
+				//float remoteSpeed = (float) (remoteY - 128) / 128.0;
+				//standby += 0.075 * remoteSpeed * dT;
 
 			} else {
 				remoteAngle.x = (float) (remoteX - 128) / 128.0;
@@ -583,18 +632,6 @@ int main() {
 			}
 			if (remote.wasButtonPushed(Transmitter::btnFire)) {
 				fireStatus = not fireStatus;
-			}
-			if (fireStatus) {
-				speed = standby;
-			} else {
-				speed = 0.0;
-			}
-			if (remote.getButton(Transmitter::btnMiddle)) {
-				if (remote.getButton(Transmitter::btnFire)) {
-					speed = 0.46;
-				} else {
-					speed = power;
-				}
 			}
 
 #			endif //REMOTE
@@ -639,10 +676,14 @@ int main() {
 			/* ========================= MOTOR MISCHER ========================= */
 #			ifdef MOTOR
 			if (displayState < DISPLAY_ZERO_DC_0 || displayState > DISPLAY_ZERO_DC_3) {
-				motor.setSpeed(speed - motorSpeed.y + motorSpeed.z,
-							   speed + motorSpeed.x - motorSpeed.z,
-							   speed + motorSpeed.y + motorSpeed.z,
-							   speed - motorSpeed.x - motorSpeed.z);
+				if (speed < 0.05) {
+					motor.setSpeed(0);
+				} else {
+					motor.setSpeed(speed - motorSpeed.y + motorSpeed.z,
+								   speed + motorSpeed.x - motorSpeed.z,
+								   speed + motorSpeed.y + motorSpeed.z,
+								   speed - motorSpeed.x - motorSpeed.z);
+				}
 			} else {
 				if (remote.getButton(Transmitter::btnFire)) {
 					motor.setSpeed(0.2);
@@ -696,7 +737,11 @@ int main() {
 					display.setCursorPos(1, 0)->write("mb:")->writeInt4(motor.getSpeedI(2))->write("%");
 					display.setCursorPos(1, 8)->write("mr:")->writeInt4(motor.getSpeedI(3))->write("%");
 					display.setCursorPos(2, 0)->write(workingMode == MODE_CONFIGURE ? "speed: " : "flymode: ")->writeFloat(speed);
-					display.setCursorPos(3, 0)->write("r:")->writeInt4(DEG(remoteAngle.x), DEG(remoteAngle.y), remoteState);
+					if (remote.isConnected()) {
+						display.setCursorPos(3, 0)->write("r:")->writeInt4(DEG(remoteAngle.x), DEG(remoteAngle.y), remoteState);
+					} else {
+						display.setCursorPos(3, 0)->write("r: not connected");
+					}
 					break;
 				case DISPLAY_ZERO_DC_0:
 				case DISPLAY_ZERO_DC_1:

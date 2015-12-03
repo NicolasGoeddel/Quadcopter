@@ -52,7 +52,7 @@ extern uint8_t rfspi_fast_shift (uint8_t data);
 
 // WL-Module settings
 #define wl_module_CH			23
-#define wl_module_PAYLOAD		4
+#define wl_module_PAYLOAD		5
 #define wl_module_RF_SETUP		(RF_SETUP_RF_PWR_18 | RF_SETUP_RF_DR_250)
 #define wl_module_CONFIG		( /* _BV(MASK_RX_DR) | _BV(MASK_TX_DS) | _BV(MASK_MAX_RT) | */ _BV(EN_CRC) /* | _BV(CRCO) */ )
 #define wl_module_TX_NR_0		0
