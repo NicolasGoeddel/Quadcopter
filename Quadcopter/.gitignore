@@ -1,0 +1,4 @@
+Quadcopter/Release
+*.o
+*.d
+*.mk
